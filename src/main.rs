@@ -5,13 +5,9 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
-use ratatui::{
-    prelude::{CrosstermBackend, Terminal},
-    widgets::List,
-};
-
+use ratatui::{prelude::*, widgets::Paragraph};
+use tuihtml::parse_html;
 use std::io::stdout;
-
 use std::error::Error;
 
 pub fn main() -> Result<(), Box<dyn Error>> {
@@ -42,14 +38,14 @@ pub fn main() -> Result<(), Box<dyn Error>> {
         <p><a href='https://100r.co/site/log.html#jan2023'>Continue Reading</a></p>
     "#;
 
-    let tui = tuihtml::parse_html(html)?;
+    let html_view = parse_html(html)?;
 
-    run_tui(tui)?;
+    run_tui(html_view)?;
 
     Ok(())
 }
 
-fn run_tui(widget: List) -> Result<(), Box<dyn Error>> {
+fn run_tui(widget: Paragraph) -> Result<(), Box<dyn Error>> {
     stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
