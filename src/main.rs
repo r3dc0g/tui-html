@@ -1,76 +1,399 @@
-mod tuihtml;
+use std::{collections::HashMap, str::Chars};
 
-use crossterm::{
-    event::{self, KeyCode, KeyEventKind},
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    ExecutableCommand,
-};
-use ratatui::{prelude::*, widgets::Paragraph};
-use tuihtml::parse_html;
-use std::io::stdout;
-use std::error::Error;
 
-pub fn main() -> Result<(), Box<dyn Error>> {
-
-    let html = r#"
-        <p>Hey everyone! This is the list of all the changes we've done to our projects and apps during the month of January. We'll also be reporting in our on position in the world, and on our future plans.</p>
-
-        <h2>Summary Of Changes</h2>
-
-        <ul>
-            <li><b>100r.co</b>, added <a href='https://100r.co/site/electrical_refit.html' target='_blank'>electrical refit</a>(portal for AC & DC electrical refit), and updated <a href='https://100r.co/site/lpg_refit.html' target='_blank'>LPG refit</a>.</li>
-            <li><b><a href='https://100r.co/site/wiktopher.html' target='_blank'>Wiktopher</a></b>, corrected chapter 8, and nearly done with lexicon.</li>
-            <li><b><a href='https://100r.co/site/weathering_software_winter.html' target='_blank'>Weathering software winter</a></b>, <a href='https://guide.handmade-seattle.com/c/2022/weathering-software-winter/' target='_blank'>video</a>(Vimeo) now has closed-captionning (same goes for <a href='https://youtu.be/9TJuOwy4aGA' target='_blank'>YouTube version</a>). Rek spent time cleaning up the auto-generated transcript.</li>
-            <li><b><a href='https://100r.co/site/uxn.html' target='_blank'>Uxn</a></b>, Andrew released <a href='https://github.com/randrew/uxn32/releases/tag/2.0' target='_blank'>Uxn32 2.0</a>.</li>
-            <li><b><a href='http://wiki.xxiivv.com/site/potato.html' target='_blank'>Potato</a></b>, added updates, potato can now assemble roms from tal files.</li>
-        </ul>
-
-        <h3>News</h3>
-
-        <p>This month, we started porting <a href='https://100r.co/site/oquonie.html' target='_blank'>Oquonie</a> to Uxn. This is a long time coming, but we weren't sure if it was possible to do, and we still had a lot to learn before even thinking of taking it on. Now, we think we are ready. We are <a href='https://merveilles.town/@neauoire/109753175335217737' target='_blank'>re-drawing the sprites</a>(Mastodon), and they look amazing. This is an important test for us, and for Uxn.</p>
-
-        <p>Here is a very adorable <a href='https://merveilles.town/@neauoire/109689586631044117' target='_blank'>little Uxn sprite</a> for Potato that comes up when a rom path was mistyped, see it also on the <a href='https://100r.co/site/uxn.html' target='_blank'>Uxn</a> page.</p>
-
-        <h3>Pino book club</h3>
-
-        <p>We're reading <b>The Journey Home: Some Words in Defense of the American West</b> by Edward Abbey.</p>
-
-        <p><a href='https://100r.co/site/log.html#jan2023'>Continue Reading</a></p>
-    "#;
-
-    let html_view = parse_html(html)?;
-
-    run_tui(html_view)?;
-
-    Ok(())
+// Enum for the different HTML tags
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Token {
+    ELEMENT(HTMLElement),
+    TEXT(String),
+    EOF,
 }
 
-fn run_tui(widget: Paragraph) -> Result<(), Box<dyn Error>> {
-    stdout().execute(EnterAlternateScreen)?;
-    enable_raw_mode()?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
-    terminal.clear()?;
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum HTMLTag {
+    HTML,
+    HEAD,
+    BODY,
+    TITLE,
+    META,
+    LINK,
+    STYLE,
+    DIV,
+    SPAN,
+    H1,
+    H2,
+    H3,
+    H4,
+    H5,
+    H6,
+    P,
+    A,
+    BOLD,
+    BR,
+    HR,
+    IMG,
+    INPUT,
+    BUTTON,
+    SELECT,
+    OPTION,
+    FORM,
+    LABEL,
+    TABLE,
+    TR,
+    TH,
+    TD,
+    UL,
+    OL,
+    LI,
+    SCRIPT,
+    TEXTAREA,
+    IFRAME,
+    VIDEO,
+    AUDIO,
+    SOURCE,
+    NAV,
+    HEADER,
+    FOOTER,
+    SECTION,
+    ARTICLE,
+    ASIDE,
+    MAIN,
+    FIGURE,
+    FIGCAPTION,
+    STRONG,
+    EM,
+    CODE,
+    PRE,
+    BLOCKQUOTE,
+    CITE,
+    ABBR,
+    TIME,
+    DATA,
+    PROGRESS,
+    METER,
+    DETAILS,
+    SUMMARY,
+    DIALOG,
+    CANVAS,
+    SVG,
+    MATH,
+    TEMPLATE,
+    SLOT,
+    OUTPUT,
+    FIELDSET,
+    LEGEND,
+    DATALIST,
+    OPTGROUP,
+    SMALL,
+    SUB,
+    SUP,
+    MARK,
+    RUBY,
+    RT,
+    RP,
+    BDI,
+    BDO,
+    WBR,
+    EMBED,
+    OBJECT,
+    PARAM,
+    TRACK,
+    MAP,
+    AREA,
+    COL,
+    COLGROUP,
+    CAPTION,
+    THEAD,
+    TBODY,
+    TFOOT,
+    NOSCRIPT,
+    BASE,
+    UNKNOWN
+}
 
+impl HTMLTag {
+    fn from_string(string: String) -> HTMLTag {
+        match string.to_lowercase().as_str() {
+            "html" => HTMLTag::HTML,
+            "head" => HTMLTag::HEAD,
+            "body" => HTMLTag::BODY,
+            "title" => HTMLTag::TITLE,
+            "meta" => HTMLTag::META,
+            "link" => HTMLTag::LINK,
+            "style" => HTMLTag::STYLE,
+            "div" => HTMLTag::DIV,
+            "span" => HTMLTag::SPAN,
+            "h1" => HTMLTag::H1,
+            "h2" => HTMLTag::H2,
+            "h3" => HTMLTag::H3,
+            "h4" => HTMLTag::H4,
+            "h5" => HTMLTag::H5,
+            "h6" => HTMLTag::H6,
+            "p" => HTMLTag::P,
+            "a" => HTMLTag::A,
+            "b" => HTMLTag::BOLD,
+            "br" => HTMLTag::BR,
+            "hr" => HTMLTag::HR,
+            "img" => HTMLTag::IMG,
+            "input" => HTMLTag::INPUT,
+            "button" => HTMLTag::BUTTON,
+            "select" => HTMLTag::SELECT,
+            "option" => HTMLTag::OPTION,
+            "form" => HTMLTag::FORM,
+            "label" => HTMLTag::LABEL,
+            "table" => HTMLTag::TABLE,
+            "tr" => HTMLTag::TR,
+            "th" => HTMLTag::TH,
+            "td" => HTMLTag::TD,
+            "ul" => HTMLTag::UL,
+            "ol" => HTMLTag::OL,
+            "li" => HTMLTag::LI,
+            "script" => HTMLTag::SCRIPT,
+            "textarea" => HTMLTag::TEXTAREA,
+            "iframe" => HTMLTag::IFRAME,
+            "video" => HTMLTag::VIDEO,
+            "audio" => HTMLTag::AUDIO,
+            "source" => HTMLTag::SOURCE,
+            "nav" => HTMLTag::NAV,
+            "header" => HTMLTag::HEADER,
+            "footer" => HTMLTag::FOOTER,
+            "section" => HTMLTag::SECTION,
+            "article" => HTMLTag::ARTICLE,
+            "aside" => HTMLTag::ASIDE,
+            "main" => HTMLTag::MAIN,
+            "figure" => HTMLTag::FIGURE,
+            "figcaption" => HTMLTag::FIGCAPTION,
+            "strong" => HTMLTag::STRONG,
+            "em" => HTMLTag::EM,
+            "code" => HTMLTag::CODE,
+            "pre" => HTMLTag::PRE,
+            "blockquote" => HTMLTag::BLOCKQUOTE,
+            "cite" => HTMLTag::CITE,
+            "abbr" => HTMLTag::ABBR,
+            "time" => HTMLTag::TIME,
+            "data" => HTMLTag::DATA,
+            "progress" => HTMLTag::PROGRESS,
+            "meter" => HTMLTag::METER,
+            "details" => HTMLTag::DETAILS,
+            "summary" => HTMLTag::SUMMARY,
+            "dialog" => HTMLTag::DIALOG,
+            "canvas" => HTMLTag::CANVAS,
+            "svg" => HTMLTag::SVG,
+            "math" => HTMLTag::MATH,
+            "template" => HTMLTag::TEMPLATE,
+            "slot" => HTMLTag::SLOT,
+            "output" => HTMLTag::OUTPUT,
+            "fieldset" => HTMLTag::FIELDSET,
+            "legend" => HTMLTag::LEGEND,
+            "datalist" => HTMLTag::DATALIST,
+            "optgroup" => HTMLTag::OPTGROUP,
+            "small" => HTMLTag::SMALL,
+            "sub" => HTMLTag::SUB,
+            "sup" => HTMLTag::SUP,
+            "mark" => HTMLTag::MARK,
+            "ruby" => HTMLTag::RUBY,
+            "rt" => HTMLTag::RT,
+            "rp" => HTMLTag::RP,
+            "bdi" => HTMLTag::BDI,
+            "bdo" => HTMLTag::BDO,
+            "wbr" => HTMLTag::WBR,
+            "embed" => HTMLTag::EMBED,
+            "object" => HTMLTag::OBJECT,
+            "param" => HTMLTag::PARAM,
+            "track" => HTMLTag::TRACK,
+            "map" => HTMLTag::MAP,
+            "area" => HTMLTag::AREA,
+            "col" => HTMLTag::COL,
+            "colgroup" => HTMLTag::COLGROUP,
+            "caption" => HTMLTag::CAPTION,
+            "thead" => HTMLTag::THEAD,
+            "tbody" => HTMLTag::TBODY,
+            "tfoot" => HTMLTag::TFOOT,
+            "noscript" => HTMLTag::NOSCRIPT,
+            "base" => HTMLTag::BASE,
+            _ => HTMLTag::UNKNOWN
+        }
+    }
+}
 
-    loop {
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HTMLElement {
+    tag: HTMLTag,
+    attributes: HashMap<String, String>,
+    closing: bool
+}
 
-        terminal.draw(|f| {
-            let size = f.size();
-            f.render_widget(widget.clone(), size);
-        })?;
+impl HTMLElement {
+    pub fn new(tag: HTMLTag, attributes: HashMap<String, String>, closing: bool) -> Self {
+        HTMLElement {
+            tag,
+            attributes,
+            closing
+        }
+    }
+}
 
-        if event::poll(std::time::Duration::from_millis(16))? {
-            if let event::Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
-                    break;
-                }
-            }
+#[derive(Debug, Clone)]
+struct HTMLTokenizer<'a> {
+    html_pos: Chars<'a>,
+    next_char: char,
+}
+
+impl HTMLTokenizer<'_> {
+
+    pub fn new(html: Chars<'_>) -> HTMLTokenizer {
+        HTMLTokenizer {
+            html_pos: html,
+            next_char: '\0',
         }
     }
 
-    terminal.clear()?;
-    stdout().execute(LeaveAlternateScreen)?;
-    disable_raw_mode()?;
+    pub fn init(&mut self) {
+        self.next_char = self.html_pos.next().unwrap();
+        self.consume_whitespace();
+    }
 
-    Ok(())
+    pub fn next(&mut self) -> Token  {
+        let mut lexeme = String::new();
+
+        while !self.html_pos.clone().eq(self.html_pos.clone().last()) {
+            if self.next_char == '<' {
+                if lexeme.is_empty() {
+                    self.next_char();
+                    return Token::ELEMENT(self.capture_element())
+                }
+                return Token::TEXT(lexeme);
+            }
+
+            lexeme.push(self.next_char);
+            self.next_char();
+        }
+
+        return Token::EOF;
+    }
+
+    fn capture_element(&mut self) -> HTMLElement {
+        let mut closing_tag = false;
+        let mut title = String::new();
+        let mut attributes = HashMap::new();
+
+        while !self.html_pos.clone().eq(self.html_pos.clone().last()) {
+
+            if self.next_char.is_whitespace() && !closing_tag {
+                self.consume_whitespace();
+                attributes = self.capture_tag_attributes();
+            }
+
+            if self.next_char == '/' {
+                closing_tag = true;
+                self.next_char();
+            }
+
+            if self.next_char == '>' {
+                self.next_char();
+                if self.next_char == '\n' {
+                    self.consume_whitespace();
+                }
+                return HTMLElement::new(HTMLTag::from_string(title), attributes, closing_tag);
+            }
+
+            title.push(self.next_char);
+            self.next_char();
+        }
+
+        return HTMLElement::new(HTMLTag::from_string(title), attributes, closing_tag);
+
+    }
+
+    fn capture_tag_attributes(&mut self) -> HashMap<String, String> {
+        let mut attributes = HashMap::new();
+        let mut key = String::new();
+        let mut value = String::new();
+
+        enum AttributeState {
+            KEY,
+            VALUE
+        }
+
+        let mut state = AttributeState::KEY;
+
+        while !self.html_pos.clone().eq(self.html_pos.clone().last()) {
+
+            if self.next_char != '=' {
+                match state {
+                    AttributeState::KEY => {
+                        key.push(self.next_char);
+                    },
+                    AttributeState::VALUE => {
+                        value.push(self.next_char);
+                    }
+                }
+            }
+            else {
+                state = AttributeState::VALUE;
+            }
+
+            if self.next_char.is_whitespace() {
+                attributes.insert(key.clone(), value.clone());
+                state = AttributeState::KEY;
+                key = String::new();
+                value = String::new();
+            }
+
+            if self.next_char == '>' {
+                attributes.insert(key.clone(), value.clone());
+                return attributes;
+            }
+
+
+            self.next_char();
+        }
+
+        return attributes;
+    }
+
+    fn next_char(&mut self) {
+        if !self.html_pos.clone().eq(self.html_pos.clone().last()) {
+            self.next_char = self.html_pos.next().unwrap();
+        }
+    }
+
+    fn consume_whitespace(&mut self) {
+        while self.next_char.is_whitespace() && !self.html_pos.clone().eq(self.html_pos.clone().last()) {
+            self.next_char();
+        }
+    }
+}
+
+fn main() {
+
+    let html = r#"
+<html>
+    <body>
+        <h1>Title</h1>
+        <p><b>Hello</b> World</p>
+        <a href="https://www.google.com">Google</a>
+        <img src="/home/garrett/Documents/image.jpg"></img>
+    </body>
+</html>
+    "#;
+
+    parse_html(html.into());
+
+}
+
+fn parse_html(html: String) {
+
+    let mut tokenizer = HTMLTokenizer::new(html.chars());
+    tokenizer.init();
+
+    let mut current_token = tokenizer.next();
+
+    while current_token != Token::EOF {
+        println!("{:?}", current_token);
+
+        current_token = tokenizer.next();
+    }
+
+    print!("\r");
 }
