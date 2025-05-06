@@ -1,7 +1,6 @@
 use std::{collections::HashMap, str::Chars};
 
 // Enum for the different HTML tags
-#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Token {
     ELEMENT(HTMLElement),
@@ -9,7 +8,6 @@ enum Token {
     EOF,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum HTMLTag {
     HTML,
@@ -112,7 +110,6 @@ enum HTMLTag {
     UNKNOWN
 }
 
-#[allow(dead_code)]
 impl HTMLTag {
     fn from_string(string: String) -> HTMLTag {
         match string.to_lowercase().as_str() {
