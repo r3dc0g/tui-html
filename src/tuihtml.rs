@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str::Chars};
 
-
 // Enum for the different HTML tags
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Token {
     ELEMENT(HTMLElement),
@@ -9,6 +9,7 @@ enum Token {
     EOF,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum HTMLTag {
     HTML,
@@ -111,6 +112,7 @@ enum HTMLTag {
     UNKNOWN
 }
 
+#[allow(dead_code)]
 impl HTMLTag {
     fn from_string(string: String) -> HTMLTag {
         match string.to_lowercase().as_str() {
@@ -269,7 +271,13 @@ impl HTMLTokenizer<'_> {
             self.next_char();
         }
 
-        return Token::EOF;
+        if lexeme.is_empty() {
+            return Token::EOF;
+        }
+
+        lexeme.push(self.next_char);
+        lexeme.push(self.html_pos.clone().last().unwrap());
+        return Token::TEXT(lexeme);
     }
 
     fn capture_element(&mut self) -> HTMLElement {
@@ -365,7 +373,42 @@ impl HTMLTokenizer<'_> {
     }
 }
 
-fn main() {
+fn parse_html(html: String) -> Vec<Token> {
+
+    let mut tokens = Vec::new();
+    let mut tokenizer = HTMLTokenizer::new(html.chars());
+    tokenizer.init();
+
+    let mut current_token = tokenizer.next();
+    tokens.push(current_token.clone());
+
+
+    while current_token != Token::EOF {
+        current_token = tokenizer.next();
+        tokens.push(current_token.clone());
+    }
+
+    tokens
+}
+
+#[test]
+fn parse_html_returns_only_text() {
+
+    let html = r#"
+Title
+Hello World
+Google"#;
+
+    let tokens = parse_html(html.into());
+
+    assert_eq!(tokens, Vec::from([
+            Token::TEXT("Title\nHello World\nGoogle".into()),
+            Token::EOF
+        ]))
+}
+
+#[test]
+fn parse_html_returns_full_html_dom() {
 
     let html = r#"
 <html>
@@ -378,22 +421,60 @@ fn main() {
 </html>
     "#;
 
-    parse_html(html.into());
 
+    let tokens = parse_html(html.into());
+
+    assert_eq!(tokens, Vec::from([
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::HTML, attributes: HashMap::new(), closing: false }),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::BODY, attributes: HashMap::new(), closing: false }),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::H1, attributes: HashMap::new(), closing: false }),
+        Token::TEXT("Title".into()),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::H1, attributes: HashMap::new(), closing: true }),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::P, attributes: HashMap::new(), closing: false }),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::BOLD, attributes: HashMap::new(), closing: false }),
+        Token::TEXT("Hello".into()),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::BOLD, attributes: HashMap::new(), closing: true }),
+        Token::TEXT(" World".into()),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::P, attributes: HashMap::new(), closing: true }),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::A, attributes: HashMap::from([("href".into(), "\"https://www.google.com\">".into()); 1]), closing: false}),
+        Token::TEXT("Google".into()),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::A, attributes: HashMap::new(), closing: true }),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::from([("src".into(), "\"/home/garrett/Documents/image.jpg\">".into()); 1]), closing: false }),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::new(), closing: true }),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::BODY, attributes: HashMap::new(), closing: true }),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::HTML, attributes: HashMap::new(), closing: true }),
+        Token::EOF
+    ]))
 }
 
-fn parse_html(html: String) {
+#[test]
+fn parse_html_returns_partial_html_elements() {
 
-    let mut tokenizer = HTMLTokenizer::new(html.chars());
-    tokenizer.init();
+    let html = r#"
+        <h1>Title</h1>
+        <p><b>Hello</b> World</p>
+        <a href="https://www.google.com">Google</a>
+        <img src="/home/garrett/Documents/image.jpg"></img>
+    "#;
 
-    let mut current_token = tokenizer.next();
 
-    while current_token != Token::EOF {
-        println!("{:?}", current_token);
+    let tokens = parse_html(html.into());
 
-        current_token = tokenizer.next();
-    }
-
-    print!("\r");
+    assert_eq!(tokens, Vec::from([
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::H1, attributes: HashMap::new(), closing: false }),
+        Token::TEXT("Title".into()),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::H1, attributes: HashMap::new(), closing: true }),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::P, attributes: HashMap::new(), closing: false }),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::BOLD, attributes: HashMap::new(), closing: false }),
+        Token::TEXT("Hello".into()),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::BOLD, attributes: HashMap::new(), closing: true }),
+        Token::TEXT(" World".into()),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::P, attributes: HashMap::new(), closing: true }),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::A, attributes: HashMap::from([("href".into(), "\"https://www.google.com\">".into()); 1]), closing: false}),
+        Token::TEXT("Google".into()),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::A, attributes: HashMap::new(), closing: true }),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::from([("src".into(), "\"/home/garrett/Documents/image.jpg\">".into()); 1]), closing: false }),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::new(), closing: true }),
+        Token::EOF
+    ]))
 }
