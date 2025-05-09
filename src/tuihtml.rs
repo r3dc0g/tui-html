@@ -324,34 +324,37 @@ impl HTMLTokenizer<'_> {
 
         while !self.html_pos.clone().eq(self.html_pos.clone().last()) {
 
-            if self.next_char != '=' {
-                match state {
-                    AttributeState::KEY => {
-                        key.push(self.next_char);
-                    },
-                    AttributeState::VALUE => {
-                        value.push(self.next_char);
-                    }
-                }
-            }
-            else {
-                state = AttributeState::VALUE;
-            }
-
-            if self.next_char.is_whitespace() {
-                attributes.insert(key.clone(), value.clone());
-                state = AttributeState::KEY;
-                key = String::new();
-                value = String::new();
-            }
-
             if self.next_char == '>' {
-                attributes.insert(key.clone(), value.clone());
                 return attributes;
             }
 
-
-            self.next_char();
+            match state {
+                AttributeState::KEY => {
+                    if self.next_char == '=' {
+                        state = AttributeState::VALUE;
+                        self.next_char();
+                        self.next_char();
+                    }
+                    else {
+                        key.push(self.next_char);
+                        self.next_char();
+                    }
+                },
+                AttributeState::VALUE => {
+                    if self.next_char == '\"' {
+                        state = AttributeState::KEY;
+                        attributes.insert(key.clone(), value.clone());
+                        self.next_char();
+                        self.consume_whitespace();
+                        key = String::new();
+                        value = String::new();
+                    }
+                    else {
+                        value.push(self.next_char);
+                        self.next_char();
+                    }
+                }
+            }
         }
 
         return attributes;
@@ -433,10 +436,10 @@ fn parse_html_returns_full_html_dom() {
         Token::ELEMENT(HTMLElement { tag: HTMLTag::BOLD, attributes: HashMap::new(), closing: true }),
         Token::TEXT(" World".into()),
         Token::ELEMENT(HTMLElement { tag: HTMLTag::P, attributes: HashMap::new(), closing: true }),
-        Token::ELEMENT(HTMLElement { tag: HTMLTag::A, attributes: HashMap::from([("href".into(), "\"https://www.google.com\">".into()); 1]), closing: false}),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::A, attributes: HashMap::from([("href".into(), "https://www.google.com".into()); 1]), closing: false}),
         Token::TEXT("Google".into()),
         Token::ELEMENT(HTMLElement { tag: HTMLTag::A, attributes: HashMap::new(), closing: true }),
-        Token::ELEMENT(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::from([("src".into(), "\"/home/garrett/Documents/image.jpg\">".into()); 1]), closing: false }),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::from([("src".into(), "/home/garrett/Documents/image.jpg".into()); 1]), closing: false }),
         Token::ELEMENT(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::new(), closing: true }),
         Token::ELEMENT(HTMLElement { tag: HTMLTag::BODY, attributes: HashMap::new(), closing: true }),
         Token::ELEMENT(HTMLElement { tag: HTMLTag::HTML, attributes: HashMap::new(), closing: true }),
@@ -467,10 +470,10 @@ fn parse_html_returns_partial_html_elements() {
         Token::ELEMENT(HTMLElement { tag: HTMLTag::BOLD, attributes: HashMap::new(), closing: true }),
         Token::TEXT(" World".into()),
         Token::ELEMENT(HTMLElement { tag: HTMLTag::P, attributes: HashMap::new(), closing: true }),
-        Token::ELEMENT(HTMLElement { tag: HTMLTag::A, attributes: HashMap::from([("href".into(), "\"https://www.google.com\">".into()); 1]), closing: false}),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::A, attributes: HashMap::from([("href".into(), "https://www.google.com".into()); 1]), closing: false}),
         Token::TEXT("Google".into()),
         Token::ELEMENT(HTMLElement { tag: HTMLTag::A, attributes: HashMap::new(), closing: true }),
-        Token::ELEMENT(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::from([("src".into(), "\"/home/garrett/Documents/image.jpg\">".into()); 1]), closing: false }),
+        Token::ELEMENT(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::from([("src".into(), "/home/garrett/Documents/image.jpg".into()); 1]), closing: false }),
         Token::ELEMENT(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::new(), closing: true }),
         Token::EOF
     ]))
