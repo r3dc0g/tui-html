@@ -1,0 +1,25 @@
+---
+source: src/tuihtml/parser.rs
+assertion_line: 390
+expression: terminal.backend()
+---
+"Title                                                                           "
+"Hello World                                                                     "
+"Google                                                                          "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "

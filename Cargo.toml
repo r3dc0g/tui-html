@@ -4,8 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-crossterm = "0.27.0"
+color-eyre = "0.6.3"
+crossterm = "0.28.1"
+ratatui = "0.29.0"
 html_parser = "0.7.0"
-ratatui = "0.27.0"
 thiserror = "1.0.61"
 tui-scrollview = "0.3.7"
+insta = "1.43.2"
+
+[dev-dependencies]
+insta = "1.43.2"
