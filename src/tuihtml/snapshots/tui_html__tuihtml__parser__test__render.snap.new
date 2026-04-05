@@ -1,6 +1,6 @@
 ---
 source: src/tuihtml/parser.rs
-assertion_line: 399
+assertion_line: 421
 expression: terminal.backend()
 ---
 "Ordered List                                                                    "
@@ -9,15 +9,15 @@ expression: terminal.backend()
 "  3. Third step                                                                 "
 "    1. Nested step A                                                            "
 "    2. Nested step B                                                            "
-"  4.  Fourth Step                                                               "
-"\n                                                                              "
-"                                                                                "
-"                                                                                "
-"                                                                                "
-"                                                                                "
-"                                                                                "
-"                                                                                "
-"                                                                                "
+"                                                                                "
+"Mixed List                                                                      "
+"  1. Note 1                                                                     "
+"  2. Node 2                                                                     "
+"  3. Note 3                                                                     "
+"    • Step 1                                                                    "
+"    • Step 2                                                                    "
+"  4. Note 4                                                                     "
+"                                                                                "
 "                                                                                "
 "                                                                                "
 "                                                                                "

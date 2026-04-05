@@ -1,97 +1,191 @@
-use std::collections::HashMap;
-use insta::assert_snapshot;
-use ratatui::{Terminal, backend::TestBackend, style::{Modifier, Stylize}, text::{Line, Span}, widgets::Paragraph};
-
+use ratatui::{style::{Modifier, Style, Stylize}, text::{Line, Span}, widgets::{Paragraph, Wrap}};
 use crate::tuihtml::{html::*, tokenizer::{HTMLTokenizer, Token}};
 
 #[derive(Default,Debug, Clone, PartialEq)]
-enum ProcessState {
+pub enum ListState {
     #[default]
-    Text,
-    Style,
-    Heading,
-    Image,
-    OrderedList,
-    UnorderedList,
-    ListItem,
+    ORDERED,
+    UNORDERED
 }
 
-#[derive(Debug)]
-struct ProcessStateMap {
-    map: HashMap<HTMLTag, ProcessState>
+#[derive(Default,Debug, Clone, PartialEq)]
+pub struct StyleContext {
+    list_state: Vec<Option<ListState>>,
+    list_index: Vec<usize>,
+    link_list: Vec<String>,
+    link_index: usize,
+    img_list: Vec<String>,
+    img_index: usize,
+    active_modifiers: Vec<Modifier>,
+    active_styles: Vec<Style>,
 }
 
-impl ProcessStateMap {
-    fn new() -> Self {
-        ProcessStateMap {
-            map: HashMap::from([
-                (HTMLTag::P, ProcessState::Text),
-                (HTMLTag::HEAD, ProcessState::Text),
-                (HTMLTag::BODY, ProcessState::Text),
-                (HTMLTag::TITLE, ProcessState::Style),
-                (HTMLTag::META, ProcessState::Style),
-                (HTMLTag::LINK, ProcessState::Style),
-                (HTMLTag::STYLE, ProcessState::Style),
-                (HTMLTag::DIV, ProcessState::Style),
-                (HTMLTag::SPAN, ProcessState::Style),
-                (HTMLTag::H1, ProcessState::Heading),
-                (HTMLTag::H2, ProcessState::Heading),
-                (HTMLTag::H3, ProcessState::Heading),
-                (HTMLTag::H4, ProcessState::Heading),
-                (HTMLTag::H5, ProcessState::Heading),
-                (HTMLTag::H6, ProcessState::Heading),
-                (HTMLTag::P, ProcessState::Text),
-                (HTMLTag::A, ProcessState::Style),
-                (HTMLTag::BOLD, ProcessState::Style),
-                (HTMLTag::BR, ProcessState::Text),
-                (HTMLTag::HR, ProcessState::Text),
-                (HTMLTag::IMG, ProcessState::Image),
-                (HTMLTag::LABEL, ProcessState::Text),
-                (HTMLTag::TABLE, ProcessState::Text),
-                (HTMLTag::TR, ProcessState::Text),
-                (HTMLTag::TH, ProcessState::Text),
-                (HTMLTag::TD, ProcessState::Text),
-                (HTMLTag::UL, ProcessState::UnorderedList),
-                (HTMLTag::OL, ProcessState::OrderedList),
-                (HTMLTag::LI, ProcessState::ListItem),
-                (HTMLTag::TEXTAREA, ProcessState::Text),
-                (HTMLTag::SOURCE, ProcessState::Text),
-                (HTMLTag::NAV, ProcessState::Style),
-                (HTMLTag::HEADER, ProcessState::Style),
-                (HTMLTag::FOOTER, ProcessState::Style),
-                (HTMLTag::SECTION, ProcessState::Style),
-                (HTMLTag::ARTICLE, ProcessState::Text),
-                (HTMLTag::ASIDE, ProcessState::Text),
-                (HTMLTag::MAIN, ProcessState::Style),
-                (HTMLTag::FIGURE, ProcessState::Image),
-                (HTMLTag::FIGCAPTION, ProcessState::Text),
-                (HTMLTag::STRONG, ProcessState::Style),
-                (HTMLTag::EM, ProcessState::Style),
-                (HTMLTag::CODE, ProcessState::Style),
-                (HTMLTag::PRE, ProcessState::Text),
-                (HTMLTag::BLOCKQUOTE, ProcessState::Text),
-                (HTMLTag::CITE, ProcessState::Text),
-                (HTMLTag::ABBR, ProcessState::Text),
-                (HTMLTag::TIME, ProcessState::Text),
-                (HTMLTag::DATA, ProcessState::Text),
-                (HTMLTag::METER, ProcessState::Text),
-                (HTMLTag::DETAILS, ProcessState::Text),
-                (HTMLTag::SUMMARY, ProcessState::Text),
-                (HTMLTag::DIALOG, ProcessState::Text),
-                (HTMLTag::CANVAS, ProcessState::Image),
-                (HTMLTag::SVG, ProcessState::Image),
-                (HTMLTag::MATH, ProcessState::Text),
-                (HTMLTag::SMALL, ProcessState::Style),
-                (HTMLTag::AREA, ProcessState::Style),
-                (HTMLTag::COL, ProcessState::Text),
-                (HTMLTag::COLGROUP, ProcessState::Text),
-                (HTMLTag::CAPTION, ProcessState::Text),
-            ])
+impl StyleContext {
+    pub fn new() -> Self {
+        Self {
+            list_state: Vec::new(),
+            list_index: Vec::new(),
+            link_list: Vec::new(),
+            link_index: 0,
+            img_list: Vec::new(),
+            img_index: 0,
+            active_modifiers: Vec::new(),
+            active_styles: Vec::new(),
         }
     }
 
-    fn get_state(&self, tag: HTMLTag) -> ProcessState {
-        return self.map.get(&tag).unwrap_or(&ProcessState::Text).clone();
+    pub fn remove_modifiers(&mut self, tag: HTMLTag) {
+        let modifiers = tag.to_modifers();
+        for modifier in modifiers {
+            match self.active_modifiers.iter().position(|m| *m == modifier) {
+                Some(i) => {
+                    self.active_modifiers.remove(i);
+                },
+                _ => {}
+            }
+
+        }
+    }
+
+    pub fn add_modifiers(&mut self, tag: HTMLTag) {
+        for modifier in tag.to_modifers() {
+            self.active_modifiers.push(modifier);
+        }
+    }
+
+    pub fn construct_span<'a>(&self, text: String) -> Span<'a> {
+        let mut span = Span::from(text);
+
+        for modifier in &self.active_modifiers {
+            span.style = span.style.add_modifier(*modifier);
+        }
+
+        for style in &self.active_styles {
+            span.style = span.style.patch(*style);
+        }
+
+        span
+    }
+}
+
+pub fn get_html_style<'a>(tag: &HTMLTag, spans: &mut Vec<Span<'a>>, context: &StyleContext) -> Vec<Line<'a>> {
+    const HR_WIDTH: usize = 120;
+
+    match tag {
+        HTMLTag::H1 => {
+            let spans_width: usize = spans.iter().map(|span| span.width()).collect::<Vec<usize>>().iter().sum();
+            let header_spacing = vec![Span::from(" ".repeat(spans_width / 2))];
+            let header_line = Line::from(vec![
+                header_spacing.clone(),
+                spans.clone(),
+                header_spacing
+            ].concat());
+            let overscore_line = Line::from(Span::from("\u{00AF}".repeat(spans_width * 2)));
+
+            spans.clear();
+            vec![header_line.centered(), overscore_line.centered()]
+        },
+        HTMLTag::HR => {
+            let overscore_line = Line::from(Span::from("\u{00AF}".repeat(HR_WIDTH)));
+            let underscore_line = Line::from(Span::from("\u{005F}".repeat(HR_WIDTH)));
+
+            vec![underscore_line.centered(), overscore_line.centered()]
+        },
+        HTMLTag::LI => {
+            match context.list_state.last() {
+                Some(last_state) => {
+                    match last_state {
+                        Some(state) => {
+                            match state {
+                                ListState::ORDERED => {
+                                    let list_item = Line::from(
+                                        vec![
+                                            vec![Span::from(format!(
+                                                "{}{}. ",
+                                                " ".repeat(2 * context.list_state.len()),
+                                                context.list_index.last()
+                                                                  .unwrap_or(&usize::from(0 as usize))
+                                                                  .clone()
+                                            ))],
+                                            spans.clone()
+                                        ].concat()
+                                    );
+                                    spans.clear();
+                                    vec![list_item]
+                                },
+                                ListState::UNORDERED => {
+                                    let list_item = Line::from(
+                                        vec![
+                                            vec![Span::from(format!(
+                                                "{}\u{2022} ",
+                                                " ".repeat(2 * context.list_state.len()),
+                                            ))],
+                                            spans.clone()
+                                        ].concat()
+                                    );
+                                    spans.clear();
+                                    vec![list_item]
+                                }
+                            }
+                        },
+                        None => {
+                            Vec::new()
+                        }
+                    }
+                },
+                None => {
+                    Vec::new()
+                }
+            }
+        },
+        HTMLTag::A => {
+            spans.push(Span::from(format!("[{}]", context.link_index)).bold());
+            Vec::new()
+        },
+        HTMLTag::H2 => {
+            let spans_width: usize = spans.iter().map(|span| span.width()).collect::<Vec<usize>>().iter().sum();
+            let above_line = Line::from(Span::from("\u{00A0}".repeat(spans_width)));
+            let header_line = Line::from(spans.clone());
+
+            spans.clear();
+            vec![above_line, header_line.underlined() ]
+        }
+        HTMLTag::H3 |
+        HTMLTag::H4 |
+        HTMLTag::H5 |
+        HTMLTag::H6 => {
+            let spans_width: usize = spans.iter().map(|span| span.width()).collect::<Vec<usize>>().iter().sum();
+            let above_line = Line::from(Span::from("\u{00A0}".repeat(spans_width)));
+            let header_line = Line::from(spans.clone());
+
+            spans.clear();
+            vec![above_line, header_line]
+        },
+        HTMLTag::NAV |
+        HTMLTag::DIV |
+        HTMLTag::OL |
+        HTMLTag::UL |
+        HTMLTag::P => {
+            match spans.is_empty() {
+                true => {
+                    Vec::new()
+                },
+                false => {
+                    let line = Line::from(spans.clone());
+                    spans.clear();
+                    vec![line]
+                }
+            }
+        },
+        _ => Vec::new()
+    }
+}
+
+pub fn is_self_closing(tag: &HTMLTag) -> bool {
+    match tag {
+        HTMLTag::HR => true,
+        HTMLTag::BR => true,
+        _ => false
     }
 }
 
@@ -113,98 +207,76 @@ fn parse_html(html: String) -> Vec<Token> {
     tokens
 }
 
-fn apply_style<'a>(element: HTMLElement, text: String) -> Span<'a> {
-    match element.tag {
-        HTMLTag::BOLD | HTMLTag::H1 | HTMLTag::H2 | HTMLTag::H3 | HTMLTag::H4 | HTMLTag::H5 | HTMLTag::H6 => {
-            return Span::from(text).add_modifier(Modifier::BOLD);
-        },
-        HTMLTag::EM => {
-            return Span::from(text).add_modifier(Modifier::ITALIC);
-        },
-        HTMLTag::A => {
-            return Span::from(text).add_modifier(Modifier::UNDERLINED);
-        }
-        _ => {
-            return Span::from(text);
-        }
-    }
-}
-
 pub fn construct_widget<'a>(html: String) -> Paragraph<'a> {
 
     let tokens = parse_html(html);
     let mut lines: Vec<Line<'a>> = Vec::new();
     let mut spans: Vec<Span<'a>> = Vec::new();
-    let state_map = ProcessStateMap::new();
-    let mut state_stack: Vec<(HTMLElement, ProcessState)> = Vec::new();
-    let mut list_indent = 0;
-    let mut list_enumerance = 1;
-    let mut is_ordered = false;
-    let mut is_unordered = false;
+    let mut style_context = StyleContext::new();
+    let mut element_stack: Vec<HTMLElement> = Vec::new();
 
     for token in tokens {
+        // println!("{:?}", token);
         match token {
             Token::Element(element) => {
-                if element.closing {
-                    if let Some(state) = state_stack.last() {
-                        let process_state = state.1.clone();
-                        match process_state {
-                            ProcessState::Heading => {
-                                if !spans.is_empty() {
-                                    lines.push(Line::from(spans.clone()));
-                                    spans.clear();
-                                }
-                            },
-                            _ => {},
+                match &element.closing {
+                    true => {
+                        if let Some(removed_element) = element_stack.pop() {
+                            lines = vec![
+                                lines,
+                                get_html_style(&removed_element.tag, &mut spans, &style_context)
+                            ].concat();
+
+                            style_context.remove_modifiers(removed_element.tag);
+
+                            match &element.tag {
+                                HTMLTag::OL | HTMLTag::UL => {
+                                    style_context.list_state.pop();
+                                    style_context.list_index.pop();
+                                },
+                                _ => {}
+                            }
                         }
                     }
+                    false => {
+                        match &element.tag {
+                            HTMLTag::OL => {
+                                style_context.list_state.push(Some(ListState::ORDERED));
+                                style_context.list_index.push(0);
+                            },
+                            HTMLTag::UL => {
+                                style_context.list_state.push(Some(ListState::UNORDERED));
+                                style_context.list_index.push(0);
+                            }
+                            HTMLTag::LI => {
+                                if let Some(index) = style_context.list_index.pop() {
+                                    let new_index = index + 1;
+                                    style_context.list_index.push(new_index);
+                                }
+                            }
+                            HTMLTag::A => {
+                                style_context.link_index += 1;
+                            }
+                            _ => {}
+                        }
 
-                }
-                else {
-                    state_stack.push((element.clone(), state_map.get_state(element.tag.clone())));
-                    if element.tag == HTMLTag::OL {
-                        is_ordered = true;
-                        list_indent += 1;
-                    }
-                    if element.tag == HTMLTag::UL {
-                        is_unordered = true;
-                        list_indent += 1;
+                        match is_self_closing(&element.tag) {
+                            true => {
+                                lines = vec![
+                                    lines,
+                                    get_html_style(&element.tag, &mut spans, &style_context)
+                                ].concat();
+                            },
+                            false => {
+                                style_context.add_modifiers(element.tag.clone());
+                                element_stack.push(element);
+                            }
+                        }
                     }
                 }
             },
             Token::Text(text) => {
-                if let Some(state) = state_stack.last() {
-                    let process_state = state.1.clone();
-                    match process_state {
-                        ProcessState::Heading => {
-                            spans.push(apply_style(state.0.clone(), text));
-                        },
-                        ProcessState::Style => {
-                            spans.push(apply_style(state.0.clone(), text));
-                        },
-                        ProcessState::Text => {
-                            spans.push(Span::from(text));
-                        },
-                        ProcessState::Image => {
-                            // Need a separate Image cache to render the image
-                            todo!();
-                        },
-                        ProcessState::ListItem => {
-                            let indent = String::from("\t".repeat(list_indent));
-                            if is_ordered {
-                                spans.push(Span::from(format!("{}{}. {}\n", indent, list_enumerance, text)));
-                                list_enumerance += 1;
-                            }
-                            if is_unordered {
-                                spans.push(Span::from(format!("{}• {}\n", indent, text)));
-                            }
-                        },
-                        _ => {}
-                    }
-                }
-                else {
-                    spans.push(Span::from(text));
-                }
+                spans.push(style_context.construct_span(text));
             },
             Token::NewLine => {
                 if !spans.is_empty() {
@@ -213,7 +285,6 @@ pub fn construct_widget<'a>(html: String) -> Paragraph<'a> {
                 }
             }
             Token::EOF => {
-                state_stack.pop();
                 if !spans.is_empty() {
                     lines.push(Line::from(spans.clone()));
                     spans.clear();
@@ -222,30 +293,43 @@ pub fn construct_widget<'a>(html: String) -> Paragraph<'a> {
         }
     }
 
-    Paragraph::new(lines)
+    Paragraph::new(lines).wrap(Wrap { trim: false })
 }
 
+mod test {
+    #![allow(dead_code)]
+    use std::collections::HashMap;
 
-#[test]
-fn parse_html_returns_only_text() {
+    use insta::assert_snapshot;
+    use ratatui::{Terminal, backend::TestBackend};
 
-    let html = r#"
+    use crate::tuihtml::{html::{HTMLElement, HTMLTag}, parser::{construct_widget, parse_html}, tokenizer::Token};
+
+
+    #[test]
+    fn parse_html_returns_only_text() {
+
+        let html = r#"
 Title
 Hello World
 Google"#;
 
-    let tokens = parse_html(html.into());
+        let tokens = parse_html(html.into());
 
-    assert_eq!(tokens, Vec::from([
-            Token::Text("Title\nHello World\nGoogle".into()),
+        assert_eq!(tokens, Vec::from([
+            Token::Text("Title".into()),
+            Token::NewLine,
+            Token::Text("Hello World".into()),
+            Token::NewLine,
+            Token::Text("Google".into()),
             Token::EOF
         ]))
-}
+    }
 
-#[test]
-fn parse_html_returns_full_html_dom() {
+    #[test]
+    fn parse_html_returns_full_html_dom() {
 
-    let html = r#"
+        let html = r#"
 <html>
     <body>
         <h1>Title</h1>
@@ -257,35 +341,35 @@ fn parse_html_returns_full_html_dom() {
     "#;
 
 
-    let tokens = parse_html(html.into());
+        let tokens = parse_html(html.into());
 
-    assert_eq!(tokens, Vec::from([
-        Token::Element(HTMLElement { tag: HTMLTag::HTML, attributes: HashMap::new(), closing: false }),
-        Token::Element(HTMLElement { tag: HTMLTag::BODY, attributes: HashMap::new(), closing: false }),
-        Token::Element(HTMLElement { tag: HTMLTag::H1, attributes: HashMap::new(), closing: false }),
-        Token::Text("Title".into()),
-        Token::Element(HTMLElement { tag: HTMLTag::H1, attributes: HashMap::new(), closing: true }),
-        Token::Element(HTMLElement { tag: HTMLTag::P, attributes: HashMap::new(), closing: false }),
-        Token::Element(HTMLElement { tag: HTMLTag::BOLD, attributes: HashMap::new(), closing: false }),
-        Token::Text("Hello".into()),
-        Token::Element(HTMLElement { tag: HTMLTag::BOLD, attributes: HashMap::new(), closing: true }),
-        Token::Text(" World".into()),
-        Token::Element(HTMLElement { tag: HTMLTag::P, attributes: HashMap::new(), closing: true }),
-        Token::Element(HTMLElement { tag: HTMLTag::A, attributes: HashMap::from([("href".into(), "https://www.google.com".into()); 1]), closing: false}),
-        Token::Text("Google".into()),
-        Token::Element(HTMLElement { tag: HTMLTag::A, attributes: HashMap::new(), closing: true }),
-        Token::Element(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::from([("src".into(), "/home/garrett/Documents/image.jpg".into()); 1]), closing: false }),
-        Token::Element(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::new(), closing: true }),
-        Token::Element(HTMLElement { tag: HTMLTag::BODY, attributes: HashMap::new(), closing: true }),
-        Token::Element(HTMLElement { tag: HTMLTag::HTML, attributes: HashMap::new(), closing: true }),
-        Token::EOF
-    ]))
-}
+        assert_eq!(tokens, Vec::from([
+            Token::Element(HTMLElement { tag: HTMLTag::HTML, attributes: HashMap::new(), closing: false }),
+            Token::Element(HTMLElement { tag: HTMLTag::BODY, attributes: HashMap::new(), closing: false }),
+            Token::Element(HTMLElement { tag: HTMLTag::H1, attributes: HashMap::new(), closing: false }),
+            Token::Text("Title".into()),
+            Token::Element(HTMLElement { tag: HTMLTag::H1, attributes: HashMap::new(), closing: true }),
+            Token::Element(HTMLElement { tag: HTMLTag::P, attributes: HashMap::new(), closing: false }),
+            Token::Element(HTMLElement { tag: HTMLTag::BOLD, attributes: HashMap::new(), closing: false }),
+            Token::Text("Hello".into()),
+            Token::Element(HTMLElement { tag: HTMLTag::BOLD, attributes: HashMap::new(), closing: true }),
+            Token::Text(" World".into()),
+            Token::Element(HTMLElement { tag: HTMLTag::P, attributes: HashMap::new(), closing: true }),
+            Token::Element(HTMLElement { tag: HTMLTag::A, attributes: HashMap::from([("href".into(), "https://www.google.com".into()); 1]), closing: false}),
+            Token::Text("Google".into()),
+            Token::Element(HTMLElement { tag: HTMLTag::A, attributes: HashMap::new(), closing: true }),
+            Token::Element(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::from([("src".into(), "/home/garrett/Documents/image.jpg".into()); 1]), closing: false }),
+            Token::Element(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::new(), closing: true }),
+            Token::Element(HTMLElement { tag: HTMLTag::BODY, attributes: HashMap::new(), closing: true }),
+            Token::Element(HTMLElement { tag: HTMLTag::HTML, attributes: HashMap::new(), closing: true }),
+            Token::EOF
+        ]))
+    }
 
-#[test]
-fn parse_html_returns_partial_html_elements() {
+    #[test]
+    fn parse_html_returns_partial_html_elements() {
 
-    let html = r#"
+        let html = r#"
         <h1>Title</h1>
         <p><b>Hello</b> World</p>
         <a href="https://www.google.com">Google</a>
@@ -293,98 +377,62 @@ fn parse_html_returns_partial_html_elements() {
     "#;
 
 
-    let tokens = parse_html(html.into());
+        let tokens = parse_html(html.into());
 
-    assert_eq!(tokens, Vec::from([
-        Token::Element(HTMLElement { tag: HTMLTag::H1, attributes: HashMap::new(), closing: false }),
-        Token::Text("Title".into()),
-        Token::Element(HTMLElement { tag: HTMLTag::H1, attributes: HashMap::new(), closing: true }),
-        Token::Element(HTMLElement { tag: HTMLTag::P, attributes: HashMap::new(), closing: false }),
-        Token::Element(HTMLElement { tag: HTMLTag::BOLD, attributes: HashMap::new(), closing: false }),
-        Token::Text("Hello".into()),
-        Token::Element(HTMLElement { tag: HTMLTag::BOLD, attributes: HashMap::new(), closing: true }),
-        Token::Text(" World".into()),
-        Token::Element(HTMLElement { tag: HTMLTag::P, attributes: HashMap::new(), closing: true }),
-        Token::Element(HTMLElement { tag: HTMLTag::A, attributes: HashMap::from([("href".into(), "https://www.google.com".into()); 1]), closing: false}),
-        Token::Text("Google".into()),
-        Token::Element(HTMLElement { tag: HTMLTag::A, attributes: HashMap::new(), closing: true }),
-        Token::Element(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::from([("src".into(), "/home/garrett/Documents/image.jpg".into()); 1]), closing: false }),
-        Token::Element(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::new(), closing: true }),
-        Token::EOF
-    ]))
-}
+        assert_eq!(tokens, Vec::from([
+            Token::Element(HTMLElement { tag: HTMLTag::H1, attributes: HashMap::new(), closing: false }),
+            Token::Text("Title".into()),
+            Token::Element(HTMLElement { tag: HTMLTag::H1, attributes: HashMap::new(), closing: true }),
+            Token::Element(HTMLElement { tag: HTMLTag::P, attributes: HashMap::new(), closing: false }),
+            Token::Element(HTMLElement { tag: HTMLTag::BOLD, attributes: HashMap::new(), closing: false }),
+            Token::Text("Hello".into()),
+            Token::Element(HTMLElement { tag: HTMLTag::BOLD, attributes: HashMap::new(), closing: true }),
+            Token::Text(" World".into()),
+            Token::Element(HTMLElement { tag: HTMLTag::P, attributes: HashMap::new(), closing: true }),
+            Token::Element(HTMLElement { tag: HTMLTag::A, attributes: HashMap::from([("href".into(), "https://www.google.com".into()); 1]), closing: false}),
+            Token::Text("Google".into()),
+            Token::Element(HTMLElement { tag: HTMLTag::A, attributes: HashMap::new(), closing: true }),
+            Token::Element(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::from([("src".into(), "/home/garrett/Documents/image.jpg".into()); 1]), closing: false }),
+            Token::Element(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::new(), closing: true }),
+            Token::EOF
+        ]))
+    }
 
-#[test]
-fn process_state_map_correctly_maps() {
-    let map = ProcessStateMap::new();
-    let mut stack = Vec::new();
-    let mut elements = Vec::new();
+    #[test]
+    fn test_render() {
+        let mut terminal = Terminal::new(TestBackend::new(80, 20)).unwrap();
+        terminal
+            .draw(|frame| {
 
-    let html = r#"
-        <h1>Title</h1>
-        <p><b>Hello</b> World</p>
-        <a href="https://www.google.com">Google</a>
-        <img src="/home/garrett/Documents/image.jpg"></img>
-        <ul>
-          <li> List Item 1 </li>
-          <li> List Item 2 </li>
-          <li> List Item 3 </li>
-        </ul>
-    "#;
+                let html = r#"
+<h2>Ordered List</h2>
+<ol>
+    <li>First step</li>
+    <li>Second step</li>
+    <li>Third step</li>
+    <ol>
+        <li>Nested step A</li>
+        <li>Nested step B</li>
+    </ol>
+</ol>
 
-    let tokens = parse_html(html.into());
+<h2>Mixed List</h2>
+<ol>
+    <li>Note 1</li>
+    <li>Node 2</li>
+    <li>Note 3</li>
+    <ul>
+        <li>Step 1</li>
+        <li>Step 2</li>
+    </ul>
+    <li>Note 4</li>
+</ol>
+"#;
 
-    for token in tokens {
-
-        println!("{:?}", token);
-
-        if let Some(element) = Token::get_html_element(token) {
-            let state = map.get_state(element.clone().tag).clone();
-            // println!("Current Process State: {:?}", state);
-
-            if stack.last().is_none() {
-                stack.push(state.clone());
-                elements.push(element.clone());
-            }
-            else if stack.last().unwrap().clone() != state {
-                stack.push(state.clone());
-                elements.push(element.clone());
-            }
-            else {
-                if stack.last().unwrap().clone() == ProcessState::Style {
-                    stack.pop();
-                    // println!("No longer Styling");
-                }
-                else {
-                    stack.pop();
-                    for _element in elements.clone().into_iter() {
-                        // println!("{:?} ", element);
-                    }
-                    elements.clear();
-                    // println!("New Line");
-
-                }
-            }
-        }
+                frame.render_widget(construct_widget(String::from(html)), frame.area());
+            })
+            .unwrap();
+        assert_snapshot!(terminal.backend());
     }
 }
 
-#[test]
-fn test_render() {
-    let mut terminal = Terminal::new(TestBackend::new(80, 20)).unwrap();
-    terminal
-        .draw(|frame| {
-
-            let html = r#"
-<h1>Title</h1>
-<p>
-    <b>Hello</b> World
-</p>
-<a href="https://www.google.com">Google</a>
-<img src="/home/garrett/Documents/image.jpg"></img>"#;
-
-            frame.render_widget(construct_widget(String::from(html)), frame.area());
-        })
-        .unwrap();
-    assert_snapshot!(terminal.backend());
-}

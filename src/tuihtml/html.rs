@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use ratatui::{style::Modifier, text::{Line, Span}};
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum HTMLTag {
     HTML,
@@ -20,6 +22,9 @@ pub enum HTMLTag {
     P,
     A,
     BOLD,
+    U,
+    S,
+    DEL,
     BR,
     HR,
     IMG,
@@ -45,6 +50,7 @@ pub enum HTMLTag {
     FIGCAPTION,
     STRONG,
     EM,
+    I,
     CODE,
     PRE,
     BLOCKQUOTE,
@@ -99,6 +105,9 @@ impl HTMLTag {
             "p" => HTMLTag::P,
             "a" => HTMLTag::A,
             "b" => HTMLTag::BOLD,
+            "u" => HTMLTag::U,
+            "s" => HTMLTag::S,
+            "del" => HTMLTag::DEL,
             "br" => HTMLTag::BR,
             "hr" => HTMLTag::HR,
             "img" => HTMLTag::IMG,
@@ -124,6 +133,7 @@ impl HTMLTag {
             "figcaption" => HTMLTag::FIGCAPTION,
             "strong" => HTMLTag::STRONG,
             "em" => HTMLTag::EM,
+            "i" => HTMLTag::I,
             "code" => HTMLTag::CODE,
             "pre" => HTMLTag::PRE,
             "blockquote" => HTMLTag::BLOCKQUOTE,
@@ -155,6 +165,27 @@ impl HTMLTag {
             "tbody" => HTMLTag::TBODY,
             "tfoot" => HTMLTag::TFOOT,
             _ => HTMLTag::UNKNOWN
+        }
+    }
+
+    pub fn to_modifers(&self) -> Vec<Modifier> {
+        match self {
+            HTMLTag::BOLD |
+            HTMLTag::STRONG |
+            HTMLTag::H1 |
+            HTMLTag::H2 |
+            HTMLTag::H3 |
+            HTMLTag::H4 |
+            HTMLTag::H5 |
+            HTMLTag::H6 => vec![Modifier::BOLD],
+
+            HTMLTag::EM | HTMLTag::I => vec![Modifier::ITALIC],
+
+            HTMLTag::U | HTMLTag::A => vec![Modifier::UNDERLINED],
+
+            HTMLTag::S | HTMLTag::DEL => vec![Modifier::CROSSED_OUT],
+
+            _ => vec![],
         }
     }
 }

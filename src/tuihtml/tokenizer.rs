@@ -56,20 +56,22 @@ impl<'a> HTMLTokenizer<'a> {
         let mut lexeme = String::new();
 
         while !self.html_pos.clone().eq(self.html_pos.clone().last()) {
-            if self.next_char == '<' {
-                if lexeme.is_empty() {
-                    self.next_char();
-                    return Token::Element(self.capture_element())
-                }
-                return Token::Text(lexeme);
-            }
-
-            if self.next_char == '\n' {
-                if lexeme.is_empty() {
-                    self.next_char();
-                    return Token::NewLine;
-                }
-                return Token::Text(lexeme);
+            match self.next_char {
+                '<' => {
+                    if lexeme.is_empty() {
+                        self.next_char();
+                        return Token::Element(self.capture_element())
+                    }
+                    return Token::Text(lexeme);
+                },
+                '\n' => {
+                    if lexeme.is_empty() {
+                        self.consume_whitespace();
+                        return Token::NewLine;
+                    }
+                    return Token::Text(lexeme);
+                },
+                _ => {}
             }
 
             lexeme.push(self.next_char);
@@ -87,7 +89,7 @@ impl<'a> HTMLTokenizer<'a> {
 
     fn capture_element(&mut self) -> HTMLElement {
         let mut closing_tag = false;
-        let mut title = String::new();
+        let mut tag = String::new();
         let mut attributes = HashMap::new();
 
         while !self.html_pos.clone().eq(self.html_pos.clone().last()) {
@@ -97,24 +99,26 @@ impl<'a> HTMLTokenizer<'a> {
                 attributes = self.capture_tag_attributes();
             }
 
-            if self.next_char == '/' {
-                closing_tag = true;
-                self.next_char();
+            match self.next_char {
+                '/' => {
+                    closing_tag = true;
+                    self.next_char();
+                },
+                '>' => {
+                    self.next_char();
+                    if self.next_char == '\n' {
+                        self.consume_whitespace();
+                    }
+                    return HTMLElement::new(HTMLTag::from_string(tag), attributes, closing_tag);
+                },
+                _ => {}
             }
 
-            if self.next_char == '>' {
-                self.next_char();
-                if self.next_char == '\n' {
-                    self.consume_whitespace();
-                }
-                return HTMLElement::new(HTMLTag::from_string(title), attributes, closing_tag);
-            }
-
-            title.push(self.next_char);
+            tag.push(self.next_char);
             self.next_char();
         }
 
-        return HTMLElement::new(HTMLTag::from_string(title), attributes, closing_tag);
+        return HTMLElement::new(HTMLTag::from_string(tag), attributes, closing_tag);
 
     }
 
