@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ratatui::{style::Modifier, text::{Line, Span}};
+use ratatui::{style::Modifier};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum HTMLTag {

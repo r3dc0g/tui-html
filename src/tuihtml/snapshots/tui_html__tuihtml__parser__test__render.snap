@@ -1,14 +1,13 @@
 ---
 source: src/tuihtml/parser.rs
-assertion_line: 440
+assertion_line: 429
 expression: terminal.backend()
 ---
 "Breht reads and reacts to "A Letter To The American People" written by Masoud   "
 "Pezeschkian, the Iranian president, as a ground invasion of some sort seems     "
-"imminent. Check out our new design in collaboration with Goods for the People   "
-"HERE[1]                                                                         "
+"imminent. Check out our new design in collaboration with Goods for the          "
+"PeopleHERE[1]                                                                   "
 "                                                                                "
-"                                                                                "
 "                                                                                "
 "                                                                                "
 " -------------------------------------------------------------------------------"
@@ -21,5 +20,6 @@ expression: terminal.backend()
 "                                                                                "
 "Learn more about Rev Left HERE[5]                                               "
 "                                                                                "
+"                                                                                "
 "                                                                                "
 "                                                                                "

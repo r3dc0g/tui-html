@@ -1,14 +1,14 @@
 use ratatui::{style::{Modifier, Style, Stylize}, text::{Line, Span}, widgets::{Paragraph, Wrap}};
 use crate::tuihtml::{html::*, tokenizer::{HTMLTokenizer, Token}};
 
-#[derive(Default,Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub enum ListState {
     #[default]
     ORDERED,
     UNORDERED
 }
 
-#[derive(Default,Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct StyleContext {
     list_state: Vec<Option<ListState>>,
     list_index: Vec<usize>,
@@ -66,6 +66,14 @@ impl StyleContext {
 
         span
     }
+
+    pub fn styled(&self) -> bool {
+        if self.active_modifiers.is_empty() && self.active_styles.is_empty() {
+            return false
+        }
+
+        true
+    }
 }
 
 pub fn get_html_style<'a>(tag: &HTMLTag, spans: &mut Vec<Span<'a>>, context: &StyleContext) -> Vec<Line<'a>> {
@@ -104,8 +112,8 @@ pub fn get_html_style<'a>(tag: &HTMLTag, spans: &mut Vec<Span<'a>>, context: &St
                                                 "{}{}. ",
                                                 " ".repeat(2 * context.list_state.len()),
                                                 context.list_index.last()
-                                                                  .unwrap_or(&usize::from(0 as usize))
-                                                                  .clone()
+                                                    .unwrap_or(&usize::from(0 as usize))
+                                                    .clone()
                                             ))],
                                             spans.clone()
                                         ].concat()
@@ -207,7 +215,7 @@ fn parse_html(html: String) -> Vec<Token> {
     tokens
 }
 
-pub fn construct_widget<'a>(html: String) -> Paragraph<'a> {
+pub fn construct_widget<'a>(html: String) -> (Paragraph<'a>, Vec<String>) {
 
     let tokens = parse_html(html);
     let mut lines: Vec<Line<'a>> = Vec::new();
@@ -217,6 +225,13 @@ pub fn construct_widget<'a>(html: String) -> Paragraph<'a> {
 
     for token in tokens {
         // println!("{:?}", token);
+
+        if Token::is_whitespace(&token) &&
+            !style_context.styled() &&
+            (element_stack.last().is_none_or(|el| el.tag != HTMLTag::P)) {
+            continue;
+        }
+
         match token {
             Token::Element(element) => {
                 match &element.closing {
@@ -231,8 +246,12 @@ pub fn construct_widget<'a>(html: String) -> Paragraph<'a> {
 
                             match &element.tag {
                                 HTMLTag::OL | HTMLTag::UL => {
+                                    lines.push(Line::raw("\u{00A0}"));
                                     style_context.list_state.pop();
                                     style_context.list_index.pop();
+                                },
+                                HTMLTag::P => {
+                                    lines.push(Line::raw("\u{00A0}"));
                                 },
                                 _ => {}
                             }
@@ -253,9 +272,12 @@ pub fn construct_widget<'a>(html: String) -> Paragraph<'a> {
                                     let new_index = index + 1;
                                     style_context.list_index.push(new_index);
                                 }
-                            }
+                            },
                             HTMLTag::A => {
                                 style_context.link_index += 1;
+                                if let Some(link) = element.attributes.get("href") {
+                                    style_context.link_list.push(link.to_owned());
+                                }
                             }
                             _ => {}
                         }
@@ -293,7 +315,7 @@ pub fn construct_widget<'a>(html: String) -> Paragraph<'a> {
         }
     }
 
-    Paragraph::new(lines).wrap(Wrap { trim: false })
+    (Paragraph::new(lines).wrap(Wrap { trim: false }), style_context.link_list)
 }
 
 mod test {
@@ -303,7 +325,7 @@ mod test {
     use insta::assert_snapshot;
     use ratatui::{Terminal, backend::TestBackend};
 
-    use crate::tuihtml::{html::{HTMLElement, HTMLTag}, parser::{construct_widget, parse_html}, tokenizer::Token};
+    use crate::tuihtml::{html::{HTMLElement, HTMLTag}, parser::{construct_widget, parse_html}, tokenizer::Token, widget::HTMLWidget};
 
 
     #[test]
@@ -404,32 +426,15 @@ Google"#;
         terminal
             .draw(|frame| {
 
+//                 let html = r#"
+// <p>Hey everyone!</p><p>This is the list of all the changes we've done to our projects during the month of March.</p> <img src="../media/content/videos/march_2026.jpg" alt="the familiar from the game Donsol is sitting on Doctor Claws desk where Mad Cat should be, looking content while being petted by the armored hand of the Inspector Gadget villain" loading="lazy" width="1200" height="679"> <ul> <li><b>Wiki</b>, documented the replacement of Pino's <a href="../site/standing_rigging_replacement.html#mar2026">backstay</a>, and created a project page for <a href="../site/no_bears_none.html">No Bears, None</a>.</li> <li><b><a href="https://kokorobot.ca/site/hakum.html">Hakum</a></b>, completed <a href="https://kokorobot.ca/media/content/hakum_sabo_10.jpg" target="_blank">page 10</a> of <a href="https://kokorobot.ca/site/sabotage_study.html" target="_blank">Sabotage Study</a>.</li> <li><b><a href="../site/rabbit_waves.html">Rabbit Waves</a></b>, added a <a href="https://rabbitwaves.ca/media/comic/coffeep1.jpg" target="_blank">comic page</a>.</li> <li><b><a href="../site/grimgrains.html">Grimgrains</a></b>, updated lactofermentation section about <a href="https://grimgrains.com/site/lactofermentation.html#jars">jars</a>.</li> <li><b><a href="../site/oquonie.html">Oquonie</a></b>, released a new version with lots of tiny optimizations.</li> <li><b><a href="../site/uxn.html">Uxn</a></b>, released a little <a href='https://wiki.xxiivv.com/site/m5' target='_blank'>emulator for the m5 stack</a>.</li> </ul> <p>We spent a big chunk of the month finishing up the new <a href="../site/donsol.html">Donsol</a>. Devine <a href="https://rabbits.srht.site/decadv/" target="_blank">documented</a> the development as part of a spring edition of <a href="https://eli.li/december-adventure" target="_blank">December Adventure</a>. All of the graphics are done and the game is fully playable, all we have left to do is to test for bugs and to write the music. It looks <a href="https://rabbits.srht.site/days/2026/03/29.html" target="_blank">fantastic</a>. We'll let you all know when we have a release date!</p> <p>The goal with <a href="https://rabbitwaves.ca">Rabbit Waves</a> was always to use storytelling to teach analog seafaring skills by making it possible to navigate between different topics by selecting highlighted objects in comic strips. Rek completed the <a href="https://rabbitwaves.ca/media/comic/coffeep1.jpg" target="_blank">first page</a>, featuring a rabbit sailor's morning coffee-making routine while living on a small turnip sailboat at sea. This comic is the first step towards that goal of building a larger world for Rabbit Waves.</p> <p>Spring is here and we are catching up with boat maintenance. While doing checks aboard last fall we noticed that Pino's <a href="../site/standing_rigging_replacement.html#mar2026">backstay</a> had a cut, we replaced the stay this week and plan to do the same for the headstay.</p> <p>This month, we also finished proofreading the revised version of the <a href="../site/victoria_to_sitka_logbook.html">Victoria to sitka logbook</a>, which we will now refer to as <a href="../site/no_bears_none.html">No Bears, None</a>. We still have work to do on it, but we hope to release it later this summer, or early fall. Lastly, we'd like to thank everyone who purchased <a href="../site/store.html">rabbit stickers</a> last month! Devine continues to draw very <a href="https://rabbits.srht.site/days/2026/03/31.html" target="_blank">beautiful spirographs</a> onto each letter.</p> <p><b>Book Club:</b> We are reading <i>Island</i> by Aldous Huxley.</p>
+// "#;
+
                 let html = r#"
-<h2>Ordered List</h2>
-<ol>
-    <li>First step</li>
-    <li>Second step</li>
-    <li>Third step</li>
-    <ol>
-        <li>Nested step A</li>
-        <li>Nested step B</li>
-    </ol>
-</ol>
-
-<h2>Mixed List</h2>
-<ol>
-    <li>Note 1</li>
-    <li>Node 2</li>
-    <li>Note 3</li>
-    <ul>
-        <li>Step 1</li>
-        <li>Step 2</li>
-    </ul>
-    <li>Note 4</li>
-</ol>
+ <p>Breht reads and reacts to "A Letter To The American People" written by Masoud Pezeschkian, the Iranian president, as a ground invasion of some sort seems imminent. Check out our new design in collaboration with <em>Goods for the People</em> <a href="https://goodsforthepeople.com/">HERE</a></p> <p> </p> <p> -------------------------------------------------------------------------------</p> <p>Support Rev Left and get bonus episodes on <a href= "https://www.patreon.com/revleftradio">Patreon</a></p> <p>Make a one-time donation to Rev Left at <a href= "https://buymeacoffee.com/revleftradio">BuyMeACoffee.com/revleftradio</a></p> <p>Follow RLR on IG <a href= "https://www.instagram.com/rev_left_radio_official/" rel= "noopener noreferrer nofollow">HERE</a></p> <p>Learn more about Rev Left <a href= "https://revleftradio.com/">HERE</a></p>
 "#;
-
-                frame.render_widget(construct_widget(String::from(html)), frame.area());
+                let html_widget = HTMLWidget::new(String::from(html));
+                frame.render_widget(html_widget.get_paragraph(), frame.area());
             })
             .unwrap();
         assert_snapshot!(terminal.backend());
