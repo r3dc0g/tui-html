@@ -1,23 +1,23 @@
 use std::{collections::HashMap, str::Chars};
 
-use crate::tuihtml::html::{HTMLElement, HTMLTag};
+use crate::tuihtml::html::{HtmlElement, HtmlTag};
 
 // Enum for the different HTML tags
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
-    Element(HTMLElement),
+    Element(HtmlElement),
     Text(String),
     NewLine,
-    EOF,
+    Eof,
 }
 
 impl Token {
-    pub fn get_html_element(token: &Token) -> Option<HTMLElement> {
+    pub fn get_html_element(token: &Token) -> Option<HtmlElement> {
         match token {
             Token::Element(e) => Some(e.clone()),
             Token::Text(_) => None,
             Token::NewLine => None,
-            Token::EOF => None,
+            Token::Eof => None,
         }
     }
 
@@ -26,7 +26,7 @@ impl Token {
             Token::Element(_) => None,
             Token::Text(s) => Some(s.clone()),
             Token::NewLine => None,
-            Token::EOF => None,
+            Token::Eof => None,
         }
     }
 
@@ -46,18 +46,21 @@ impl Token {
 }
 
 #[derive(Debug, Clone)]
-pub struct HTMLTokenizer<'a> {
+pub struct HtmlTokenizer<'a> {
     html_pos: Chars<'a>,
     next_char: Option<char>,
 }
 
-impl<'a> HTMLTokenizer<'a> {
+impl<'a> HtmlTokenizer<'a> {
 
-    pub fn new(html: Chars<'a>) -> HTMLTokenizer<'a> {
-        HTMLTokenizer {
+    pub fn new(html: Chars<'a>) -> HtmlTokenizer<'a> {
+        let mut tokenizer = HtmlTokenizer {
             html_pos: html,
             next_char: Some('\0'),
-        }
+        };
+
+        tokenizer.init();
+        tokenizer
     }
 
     pub fn init(&mut self) {
@@ -88,28 +91,30 @@ impl<'a> HTMLTokenizer<'a> {
                     break;
                 },
                 _ => {
-                    lexeme.push(self.next_char.unwrap());
+                    if let Some(char) = self.next_char {
+                        lexeme.push(char);
+                    }
                     self.next_char();
                 }
             }
         }
 
         if lexeme.is_empty() {
-            Token::EOF
+            Token::Eof
         }
         else {
             Token::Text(lexeme)
         }
     }
 
-    fn capture_element(&mut self) -> HTMLElement {
+    fn capture_element(&mut self) -> HtmlElement {
         let mut closing_tag = false;
         let mut tag = String::new();
         let mut attributes = HashMap::new();
 
         loop {
 
-            if self.next_char.is_some() && self.next_char.unwrap().is_whitespace() && !closing_tag {
+            if self.next_char.is_some_and(|c| c.is_whitespace()) && !closing_tag {
                 self.consume_whitespace();
                 attributes = self.capture_tag_attributes();
             }
@@ -121,10 +126,10 @@ impl<'a> HTMLTokenizer<'a> {
                 },
                 Some('>') => {
                     self.next_char();
-                    if let Some('\n') = self.next_char {
+                    if self.next_char.is_some_and(|c| c == '\n' || c == '\r' ) {
                         self.consume_whitespace();
                     }
-                    return HTMLElement::new(HTMLTag::from_string(tag), attributes, closing_tag);
+                    return HtmlElement::new(HtmlTag::from_string(&tag), attributes, closing_tag);
                 },
                 None => {
                     break;
@@ -132,11 +137,13 @@ impl<'a> HTMLTokenizer<'a> {
                 _ => {}
             }
 
-            tag.push(self.next_char.unwrap());
+            if let Some(char) = self.next_char {
+                tag.push(char);
+            }
             self.next_char();
         }
 
-        HTMLElement::new(HTMLTag::from_string(tag), attributes, closing_tag)
+        HtmlElement::new(HtmlTag::from_string(&tag), attributes, closing_tag)
 
     }
 
@@ -182,10 +189,16 @@ impl<'a> HTMLTokenizer<'a> {
                 _ => {
                     match state {
                         AttributeState::Key => {
-                            key.push(self.next_char.unwrap());
+                            if self.next_char.is_some_and(|c| !c.is_whitespace()) {
+                                if let Some(char) = self.next_char {
+                                    key.push(char);
+                                }
+                            }
                         },
                         AttributeState::Value => {
-                            value.push(self.next_char.unwrap());
+                            if let Some(char) = self.next_char {
+                                value.push(char);
+                            }
                         }
                     }
                     self.next_char();
@@ -201,7 +214,7 @@ impl<'a> HTMLTokenizer<'a> {
     }
 
     fn consume_whitespace(&mut self) {
-        while self.next_char.is_some() && self.next_char.unwrap().is_whitespace() {
+        while self.next_char.is_some_and(|c| c.is_whitespace()) {
             self.next_char();
         }
     }

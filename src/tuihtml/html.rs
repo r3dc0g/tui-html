@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use ratatui::{style::Modifier};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum HTMLTag {
+pub enum HtmlTag {
     HTML,
     HEAD,
     BODY,
@@ -84,106 +84,106 @@ pub enum HTMLTag {
     UNKNOWN,
 }
 
-impl HTMLTag {
-    pub fn from_string(string: String) -> HTMLTag {
+impl HtmlTag {
+    pub fn from_string(string: &str) -> HtmlTag {
         match string.to_lowercase().as_str() {
-            "html" => HTMLTag::HTML,
-            "head" => HTMLTag::HEAD,
-            "body" => HTMLTag::BODY,
-            "title" => HTMLTag::TITLE,
-            "meta" => HTMLTag::META,
-            "link" => HTMLTag::LINK,
-            "style" => HTMLTag::STYLE,
-            "div" => HTMLTag::DIV,
-            "span" => HTMLTag::SPAN,
-            "h1" => HTMLTag::H1,
-            "h2" => HTMLTag::H2,
-            "h3" => HTMLTag::H3,
-            "h4" => HTMLTag::H4,
-            "h5" => HTMLTag::H5,
-            "h6" => HTMLTag::H6,
-            "p" => HTMLTag::P,
-            "a" => HTMLTag::A,
-            "b" => HTMLTag::BOLD,
-            "u" => HTMLTag::U,
-            "s" => HTMLTag::S,
-            "del" => HTMLTag::DEL,
-            "br" => HTMLTag::BR,
-            "hr" => HTMLTag::HR,
-            "img" => HTMLTag::IMG,
-            "label" => HTMLTag::LABEL,
-            "table" => HTMLTag::TABLE,
-            "tr" => HTMLTag::TR,
-            "th" => HTMLTag::TH,
-            "td" => HTMLTag::TD,
-            "ul" => HTMLTag::UL,
-            "ol" => HTMLTag::OL,
-            "li" => HTMLTag::LI,
-            "textarea" => HTMLTag::TEXTAREA,
-            "iframe" => HTMLTag::IFRAME,
-            "source" => HTMLTag::SOURCE,
-            "nav" => HTMLTag::NAV,
-            "header" => HTMLTag::HEADER,
-            "footer" => HTMLTag::FOOTER,
-            "section" => HTMLTag::SECTION,
-            "article" => HTMLTag::ARTICLE,
-            "aside" => HTMLTag::ASIDE,
-            "main" => HTMLTag::MAIN,
-            "figure" => HTMLTag::FIGURE,
-            "figcaption" => HTMLTag::FIGCAPTION,
-            "strong" => HTMLTag::STRONG,
-            "em" => HTMLTag::EM,
-            "i" => HTMLTag::I,
-            "code" => HTMLTag::CODE,
-            "pre" => HTMLTag::PRE,
-            "blockquote" => HTMLTag::BLOCKQUOTE,
-            "cite" => HTMLTag::CITE,
-            "abbr" => HTMLTag::ABBR,
-            "time" => HTMLTag::TIME,
-            "data" => HTMLTag::DATA,
-            "progress" => HTMLTag::PROGRESS,
-            "meter" => HTMLTag::METER,
-            "details" => HTMLTag::DETAILS,
-            "summary" => HTMLTag::SUMMARY,
-            "dialog" => HTMLTag::DIALOG,
-            "canvas" => HTMLTag::CANVAS,
-            "svg" => HTMLTag::SVG,
-            "math" => HTMLTag::MATH,
-            "template" => HTMLTag::TEMPLATE,
-            "slot" => HTMLTag::SLOT,
-            "output" => HTMLTag::OUTPUT,
-            "fieldset" => HTMLTag::FIELDSET,
-            "legend" => HTMLTag::LEGEND,
-            "datalist" => HTMLTag::DATALIST,
-            "optgroup" => HTMLTag::OPTGROUP,
-            "small" => HTMLTag::SMALL,
-            "area" => HTMLTag::AREA,
-            "col" => HTMLTag::COL,
-            "colgroup" => HTMLTag::COLGROUP,
-            "caption" => HTMLTag::CAPTION,
-            "thead" => HTMLTag::THEAD,
-            "tbody" => HTMLTag::TBODY,
-            "tfoot" => HTMLTag::TFOOT,
-            _ => HTMLTag::UNKNOWN
+            "html" => HtmlTag::HTML,
+            "head" => HtmlTag::HEAD,
+            "body" => HtmlTag::BODY,
+            "title" => HtmlTag::TITLE,
+            "meta" => HtmlTag::META,
+            "link" => HtmlTag::LINK,
+            "style" => HtmlTag::STYLE,
+            "div" => HtmlTag::DIV,
+            "span" => HtmlTag::SPAN,
+            "h1" => HtmlTag::H1,
+            "h2" => HtmlTag::H2,
+            "h3" => HtmlTag::H3,
+            "h4" => HtmlTag::H4,
+            "h5" => HtmlTag::H5,
+            "h6" => HtmlTag::H6,
+            "p" => HtmlTag::P,
+            "a" => HtmlTag::A,
+            "b" => HtmlTag::BOLD,
+            "u" => HtmlTag::U,
+            "s" => HtmlTag::S,
+            "del" => HtmlTag::DEL,
+            "br" => HtmlTag::BR,
+            "hr" => HtmlTag::HR,
+            "img" => HtmlTag::IMG,
+            "label" => HtmlTag::LABEL,
+            "table" => HtmlTag::TABLE,
+            "tr" => HtmlTag::TR,
+            "th" => HtmlTag::TH,
+            "td" => HtmlTag::TD,
+            "ul" => HtmlTag::UL,
+            "ol" => HtmlTag::OL,
+            "li" => HtmlTag::LI,
+            "textarea" => HtmlTag::TEXTAREA,
+            "iframe" => HtmlTag::IFRAME,
+            "source" => HtmlTag::SOURCE,
+            "nav" => HtmlTag::NAV,
+            "header" => HtmlTag::HEADER,
+            "footer" => HtmlTag::FOOTER,
+            "section" => HtmlTag::SECTION,
+            "article" => HtmlTag::ARTICLE,
+            "aside" => HtmlTag::ASIDE,
+            "main" => HtmlTag::MAIN,
+            "figure" => HtmlTag::FIGURE,
+            "figcaption" => HtmlTag::FIGCAPTION,
+            "strong" => HtmlTag::STRONG,
+            "em" => HtmlTag::EM,
+            "i" => HtmlTag::I,
+            "code" => HtmlTag::CODE,
+            "pre" => HtmlTag::PRE,
+            "blockquote" => HtmlTag::BLOCKQUOTE,
+            "cite" => HtmlTag::CITE,
+            "abbr" => HtmlTag::ABBR,
+            "time" => HtmlTag::TIME,
+            "data" => HtmlTag::DATA,
+            "progress" => HtmlTag::PROGRESS,
+            "meter" => HtmlTag::METER,
+            "details" => HtmlTag::DETAILS,
+            "summary" => HtmlTag::SUMMARY,
+            "dialog" => HtmlTag::DIALOG,
+            "canvas" => HtmlTag::CANVAS,
+            "svg" => HtmlTag::SVG,
+            "math" => HtmlTag::MATH,
+            "template" => HtmlTag::TEMPLATE,
+            "slot" => HtmlTag::SLOT,
+            "output" => HtmlTag::OUTPUT,
+            "fieldset" => HtmlTag::FIELDSET,
+            "legend" => HtmlTag::LEGEND,
+            "datalist" => HtmlTag::DATALIST,
+            "optgroup" => HtmlTag::OPTGROUP,
+            "small" => HtmlTag::SMALL,
+            "area" => HtmlTag::AREA,
+            "col" => HtmlTag::COL,
+            "colgroup" => HtmlTag::COLGROUP,
+            "caption" => HtmlTag::CAPTION,
+            "thead" => HtmlTag::THEAD,
+            "tbody" => HtmlTag::TBODY,
+            "tfoot" => HtmlTag::TFOOT,
+            _ => HtmlTag::UNKNOWN
         }
     }
 
-    pub fn to_modifers(&self) -> Vec<Modifier> {
+    pub fn to_modifiers(&self) -> Vec<Modifier> {
         match self {
-            HTMLTag::BOLD |
-            HTMLTag::STRONG |
-            HTMLTag::H1 |
-            HTMLTag::H2 |
-            HTMLTag::H3 |
-            HTMLTag::H4 |
-            HTMLTag::H5 |
-            HTMLTag::H6 => vec![Modifier::BOLD],
+            HtmlTag::BOLD |
+            HtmlTag::STRONG |
+            HtmlTag::H1 |
+            HtmlTag::H2 |
+            HtmlTag::H3 |
+            HtmlTag::H4 |
+            HtmlTag::H5 |
+            HtmlTag::H6 => vec![Modifier::BOLD],
 
-            HTMLTag::EM | HTMLTag::I => vec![Modifier::ITALIC],
+            HtmlTag::EM | HtmlTag::I => vec![Modifier::ITALIC],
 
-            HTMLTag::U | HTMLTag::A => vec![Modifier::UNDERLINED],
+            HtmlTag::U | HtmlTag::A => vec![Modifier::UNDERLINED],
 
-            HTMLTag::S | HTMLTag::DEL => vec![Modifier::CROSSED_OUT],
+            HtmlTag::S | HtmlTag::DEL => vec![Modifier::CROSSED_OUT],
 
             _ => vec![],
         }
@@ -191,15 +191,15 @@ impl HTMLTag {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HTMLElement {
-    pub tag: HTMLTag,
+pub struct HtmlElement {
+    pub tag: HtmlTag,
     pub attributes: HashMap<String, String>,
     pub closing: bool
 }
 
-impl HTMLElement {
-    pub fn new(tag: HTMLTag, attributes: HashMap<String, String>, closing: bool) -> Self {
-        HTMLElement {
+impl HtmlElement {
+    pub fn new(tag: HtmlTag, attributes: HashMap<String, String>, closing: bool) -> Self {
+        HtmlElement {
             tag,
             attributes,
             closing

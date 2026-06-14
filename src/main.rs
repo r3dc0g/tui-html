@@ -3,7 +3,7 @@ pub mod tuihtml;
 use color_eyre::Result;
 use crossterm::event::{self, Event};
 use ratatui::{DefaultTerminal, Frame};
-use crate::tuihtml::widget::HTMLWidget;
+use crate::tuihtml::widget::HtmlWidget;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
@@ -168,7 +168,7 @@ fn render(frame: &mut Frame) {
 //     let html = r#"
 //  <p>Breht reads and reacts to "A Letter To The American People" written by Masoud Pezeschkian, the Iranian president, as a ground invasion of some sort seems imminent. Check out our new design in collaboration with <em>Goods for the People</em> <a href="https://goodsforthepeople.com/">HERE</a></p> <p> </p> <p> -------------------------------------------------------------------------------</p> <p>Support Rev Left and get bonus episodes on <a href= "https://www.patreon.com/revleftradio">Patreon</a></p> <p>Make a one-time donation to Rev Left at <a href= "https://buymeacoffee.com/revleftradio">BuyMeACoffee.com/revleftradio</a></p> <p>Follow RLR on IG <a href= "https://www.instagram.com/rev_left_radio_official/" rel= "noopener noreferrer nofollow">HERE</a></p> <p>Learn more about Rev Left <a href= "https://revleftradio.com/">HERE</a></p>
 // "#;
-    let html_widget = HTMLWidget::new(String::from(html));
+    let html_widget = HtmlWidget::new(String::from(html));
     frame.render_widget(html_widget.get_paragraph(), frame.area());
 }
 

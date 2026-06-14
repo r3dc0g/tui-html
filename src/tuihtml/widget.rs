@@ -2,12 +2,12 @@ use ratatui::widgets::Paragraph;
 
 use crate::tuihtml::parser::construct_widget;
 
-pub struct HTMLWidget<'a> {
+pub struct HtmlWidget<'a> {
     paragraph: Paragraph<'a>,
     links: Vec<String>,
 }
 
-impl HTMLWidget<'_> {
+impl HtmlWidget<'_> {
     pub fn new(html: String) -> Self {
         let (paragraph, links) = construct_widget(html);
         Self {

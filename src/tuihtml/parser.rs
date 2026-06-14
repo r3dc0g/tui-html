@@ -1,11 +1,11 @@
 use ratatui::{style::{Modifier, Style, Stylize}, text::{Line, Span}, widgets::{Paragraph, Wrap}};
-use crate::tuihtml::{html::*, tokenizer::{HTMLTokenizer, Token}};
+use crate::tuihtml::{html::*, tokenizer::{HtmlTokenizer, Token}};
 
 #[derive(Default, Debug, Clone, PartialEq)]
 pub enum ListState {
     #[default]
-    ORDERED,
-    UNORDERED
+    Ordered,
+    Unordered
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -34,8 +34,8 @@ impl StyleContext {
         }
     }
 
-    pub fn remove_modifiers(&mut self, tag: HTMLTag) {
-        let modifiers = tag.to_modifers();
+    pub fn remove_modifiers(&mut self, tag: HtmlTag) {
+        let modifiers = tag.to_modifiers();
         for modifier in modifiers {
             if let Some(i) = self.active_modifiers.iter().position(|m| *m == modifier) {
                 self.active_modifiers.remove(i);
@@ -44,8 +44,8 @@ impl StyleContext {
         }
     }
 
-    pub fn add_modifiers(&mut self, tag: HTMLTag) {
-        for modifier in tag.to_modifers() {
+    pub fn add_modifiers(&mut self, tag: HtmlTag) {
+        for modifier in tag.to_modifiers() {
             self.active_modifiers.push(modifier);
         }
     }
@@ -73,11 +73,11 @@ impl StyleContext {
     }
 }
 
-pub fn get_html_style<'a>(tag: &HTMLTag, spans: &mut Vec<Span<'a>>, context: &StyleContext) -> Vec<Line<'a>> {
+pub fn get_html_style<'a>(tag: &HtmlTag, spans: &mut Vec<Span<'a>>, context: &StyleContext) -> Vec<Line<'a>> {
     const HR_WIDTH: usize = 120;
 
     match tag {
-        HTMLTag::H1 => {
+        HtmlTag::H1 => {
             let spans_width: usize = spans.iter().map(|span| span.width()).collect::<Vec<usize>>().iter().sum();
             let header_spacing = vec![Span::from(" ".repeat(spans_width / 2))];
             let header_line = Line::from([header_spacing.clone(),
@@ -88,19 +88,19 @@ pub fn get_html_style<'a>(tag: &HTMLTag, spans: &mut Vec<Span<'a>>, context: &St
             spans.clear();
             vec![header_line.centered(), overscore_line.centered()]
         },
-        HTMLTag::HR => {
+        HtmlTag::HR => {
             let overscore_line = Line::from(Span::from("\u{00AF}".repeat(HR_WIDTH)));
             let underscore_line = Line::from(Span::from("\u{005F}".repeat(HR_WIDTH)));
 
             vec![underscore_line.centered(), overscore_line.centered()]
         },
-        HTMLTag::LI => {
+        HtmlTag::LI => {
             match context.list_state.last() {
                 Some(last_state) => {
                     match last_state {
                         Some(state) => {
                             match state {
-                                ListState::ORDERED => {
+                                ListState::Ordered => {
                                     let list_item = Line::from(
                                         [vec![Span::from(format!(
                                                 "{}{}. ",
@@ -114,7 +114,7 @@ pub fn get_html_style<'a>(tag: &HTMLTag, spans: &mut Vec<Span<'a>>, context: &St
                                     spans.clear();
                                     vec![list_item]
                                 },
-                                ListState::UNORDERED => {
+                                ListState::Unordered => {
                                     let list_item = Line::from(
                                         [vec![Span::from(format!(
                                                 "{}\u{2022} ",
@@ -137,11 +137,11 @@ pub fn get_html_style<'a>(tag: &HTMLTag, spans: &mut Vec<Span<'a>>, context: &St
                 }
             }
         },
-        HTMLTag::A => {
+        HtmlTag::A => {
             spans.push(Span::from(format!("[{}]", context.link_index)).bold());
             Vec::new()
         },
-        HTMLTag::H2 => {
+        HtmlTag::H2 => {
             let spans_width: usize = spans.iter().map(|span| span.width()).collect::<Vec<usize>>().iter().sum();
             let above_line = Line::from(Span::from("\u{00A0}".repeat(spans_width)));
             let header_line = Line::from(spans.clone());
@@ -149,10 +149,10 @@ pub fn get_html_style<'a>(tag: &HTMLTag, spans: &mut Vec<Span<'a>>, context: &St
             spans.clear();
             vec![above_line, header_line.underlined() ]
         }
-        HTMLTag::H3 |
-        HTMLTag::H4 |
-        HTMLTag::H5 |
-        HTMLTag::H6 => {
+        HtmlTag::H3 |
+        HtmlTag::H4 |
+        HtmlTag::H5 |
+        HtmlTag::H6 => {
             let spans_width: usize = spans.iter().map(|span| span.width()).collect::<Vec<usize>>().iter().sum();
             let above_line = Line::from(Span::from("\u{00A0}".repeat(spans_width)));
             let header_line = Line::from(spans.clone());
@@ -160,11 +160,11 @@ pub fn get_html_style<'a>(tag: &HTMLTag, spans: &mut Vec<Span<'a>>, context: &St
             spans.clear();
             vec![above_line, header_line]
         },
-        HTMLTag::NAV |
-        HTMLTag::DIV |
-        HTMLTag::OL |
-        HTMLTag::UL |
-        HTMLTag::P => {
+        HtmlTag::NAV |
+        HtmlTag::DIV |
+        HtmlTag::OL |
+        HtmlTag::UL |
+        HtmlTag::P => {
             match spans.is_empty() {
                 true => {
                     Vec::new()
@@ -180,10 +180,10 @@ pub fn get_html_style<'a>(tag: &HTMLTag, spans: &mut Vec<Span<'a>>, context: &St
     }
 }
 
-pub fn is_self_closing(tag: &HTMLTag) -> bool {
+pub fn is_self_closing(tag: &HtmlTag) -> bool {
     match tag {
-        HTMLTag::HR => true,
-        HTMLTag::BR => true,
+        HtmlTag::HR => true,
+        HtmlTag::BR => true,
         _ => false
     }
 }
@@ -191,14 +191,13 @@ pub fn is_self_closing(tag: &HTMLTag) -> bool {
 fn parse_html(html: String) -> Vec<Token> {
 
     let mut tokens = Vec::new();
-    let mut tokenizer = HTMLTokenizer::new(html.chars());
-    tokenizer.init();
+    let mut tokenizer = HtmlTokenizer::new(html.chars());
 
     let mut current_token = tokenizer.next();
     tokens.push(current_token.clone());
 
 
-    while current_token != Token::EOF {
+    while current_token != Token::Eof {
         current_token = tokenizer.next();
         tokens.push(current_token.clone());
     }
@@ -212,13 +211,13 @@ pub fn construct_widget<'a>(html: String) -> (Paragraph<'a>, Vec<String>) {
     let mut lines: Vec<Line<'a>> = Vec::new();
     let mut spans: Vec<Span<'a>> = Vec::new();
     let mut style_context = StyleContext::new();
-    let mut element_stack: Vec<HTMLElement> = Vec::new();
+    let mut element_stack: Vec<HtmlElement> = Vec::new();
 
     for token in tokens {
 
         if Token::is_whitespace(&token) &&
             !style_context.styled() &&
-            (element_stack.last().is_none_or(|el| el.tag != HTMLTag::P)) {
+            (element_stack.last().is_none_or(|el| el.tag != HtmlTag::P && el.tag != HtmlTag::DIV && el.tag != HtmlTag::SECTION && el.tag != HtmlTag::ARTICLE)) {
             continue;
         }
 
@@ -233,12 +232,12 @@ pub fn construct_widget<'a>(html: String) -> (Paragraph<'a>, Vec<String>) {
                             style_context.remove_modifiers(removed_element.tag);
 
                             match &element.tag {
-                                HTMLTag::OL | HTMLTag::UL => {
+                                HtmlTag::OL | HtmlTag::UL => {
                                     lines.push(Line::raw("\u{00A0}"));
                                     style_context.list_state.pop();
                                     style_context.list_index.pop();
                                 },
-                                HTMLTag::P => {
+                                HtmlTag::P => {
                                     lines.push(Line::raw("\u{00A0}"));
                                 },
                                 _ => {}
@@ -247,21 +246,21 @@ pub fn construct_widget<'a>(html: String) -> (Paragraph<'a>, Vec<String>) {
                     }
                     false => {
                         match &element.tag {
-                            HTMLTag::OL => {
-                                style_context.list_state.push(Some(ListState::ORDERED));
+                            HtmlTag::OL => {
+                                style_context.list_state.push(Some(ListState::Ordered));
                                 style_context.list_index.push(0);
                             },
-                            HTMLTag::UL => {
-                                style_context.list_state.push(Some(ListState::UNORDERED));
+                            HtmlTag::UL => {
+                                style_context.list_state.push(Some(ListState::Unordered));
                                 style_context.list_index.push(0);
                             }
-                            HTMLTag::LI => {
+                            HtmlTag::LI => {
                                 if let Some(index) = style_context.list_index.pop() {
                                     let new_index = index + 1;
                                     style_context.list_index.push(new_index);
                                 }
                             },
-                            HTMLTag::A => {
+                            HtmlTag::A => {
                                 style_context.link_index += 1;
                                 if let Some(link) = element.attributes.get("href") {
                                     style_context.link_list.push(link.to_owned());
@@ -292,7 +291,7 @@ pub fn construct_widget<'a>(html: String) -> (Paragraph<'a>, Vec<String>) {
                     spans.clear();
                 }
             }
-            Token::EOF => {
+            Token::Eof => {
                 if !spans.is_empty() {
                     lines.push(Line::from(spans.clone()));
                     spans.clear();
@@ -311,7 +310,7 @@ mod test {
     use insta::assert_snapshot;
     use ratatui::{Terminal, backend::TestBackend};
 
-    use crate::tuihtml::{html::{HTMLElement, HTMLTag}, parser::{construct_widget, parse_html}, tokenizer::Token, widget::HTMLWidget};
+    use crate::tuihtml::{html::{HtmlElement, HtmlTag}, parser::{construct_widget, parse_html}, tokenizer::Token, widget::HtmlWidget};
 
 
     #[test]
@@ -330,7 +329,7 @@ Google"#;
             Token::Text("Hello World".into()),
             Token::NewLine,
             Token::Text("Google".into()),
-            Token::EOF
+            Token::Eof
         ]))
     }
 
@@ -352,25 +351,25 @@ Google"#;
         let tokens = parse_html(html.into());
 
         assert_eq!(tokens, Vec::from([
-            Token::Element(HTMLElement { tag: HTMLTag::HTML, attributes: HashMap::new(), closing: false }),
-            Token::Element(HTMLElement { tag: HTMLTag::BODY, attributes: HashMap::new(), closing: false }),
-            Token::Element(HTMLElement { tag: HTMLTag::H1, attributes: HashMap::new(), closing: false }),
+            Token::Element(HtmlElement { tag: HtmlTag::HTML, attributes: HashMap::new(), closing: false }),
+            Token::Element(HtmlElement { tag: HtmlTag::BODY, attributes: HashMap::new(), closing: false }),
+            Token::Element(HtmlElement { tag: HtmlTag::H1, attributes: HashMap::new(), closing: false }),
             Token::Text("Title".into()),
-            Token::Element(HTMLElement { tag: HTMLTag::H1, attributes: HashMap::new(), closing: true }),
-            Token::Element(HTMLElement { tag: HTMLTag::P, attributes: HashMap::new(), closing: false }),
-            Token::Element(HTMLElement { tag: HTMLTag::BOLD, attributes: HashMap::new(), closing: false }),
+            Token::Element(HtmlElement { tag: HtmlTag::H1, attributes: HashMap::new(), closing: true }),
+            Token::Element(HtmlElement { tag: HtmlTag::P, attributes: HashMap::new(), closing: false }),
+            Token::Element(HtmlElement { tag: HtmlTag::BOLD, attributes: HashMap::new(), closing: false }),
             Token::Text("Hello".into()),
-            Token::Element(HTMLElement { tag: HTMLTag::BOLD, attributes: HashMap::new(), closing: true }),
+            Token::Element(HtmlElement { tag: HtmlTag::BOLD, attributes: HashMap::new(), closing: true }),
             Token::Text(" World".into()),
-            Token::Element(HTMLElement { tag: HTMLTag::P, attributes: HashMap::new(), closing: true }),
-            Token::Element(HTMLElement { tag: HTMLTag::A, attributes: HashMap::from([("href".into(), "https://www.google.com".into()); 1]), closing: false}),
+            Token::Element(HtmlElement { tag: HtmlTag::P, attributes: HashMap::new(), closing: true }),
+            Token::Element(HtmlElement { tag: HtmlTag::A, attributes: HashMap::from([("href".into(), "https://www.google.com".into()); 1]), closing: false}),
             Token::Text("Google".into()),
-            Token::Element(HTMLElement { tag: HTMLTag::A, attributes: HashMap::new(), closing: true }),
-            Token::Element(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::from([("src".into(), "/home/garrett/Documents/image.jpg".into()); 1]), closing: false }),
-            Token::Element(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::new(), closing: true }),
-            Token::Element(HTMLElement { tag: HTMLTag::BODY, attributes: HashMap::new(), closing: true }),
-            Token::Element(HTMLElement { tag: HTMLTag::HTML, attributes: HashMap::new(), closing: true }),
-            Token::EOF
+            Token::Element(HtmlElement { tag: HtmlTag::A, attributes: HashMap::new(), closing: true }),
+            Token::Element(HtmlElement { tag: HtmlTag::IMG, attributes: HashMap::from([("src".into(), "/home/garrett/Documents/image.jpg".into()); 1]), closing: false }),
+            Token::Element(HtmlElement { tag: HtmlTag::IMG, attributes: HashMap::new(), closing: true }),
+            Token::Element(HtmlElement { tag: HtmlTag::BODY, attributes: HashMap::new(), closing: true }),
+            Token::Element(HtmlElement { tag: HtmlTag::HTML, attributes: HashMap::new(), closing: true }),
+            Token::Eof
         ]))
     }
 
@@ -388,42 +387,39 @@ Google"#;
         let tokens = parse_html(html.into());
 
         assert_eq!(tokens, Vec::from([
-            Token::Element(HTMLElement { tag: HTMLTag::H1, attributes: HashMap::new(), closing: false }),
+            Token::Element(HtmlElement { tag: HtmlTag::H1, attributes: HashMap::new(), closing: false }),
             Token::Text("Title".into()),
-            Token::Element(HTMLElement { tag: HTMLTag::H1, attributes: HashMap::new(), closing: true }),
-            Token::Element(HTMLElement { tag: HTMLTag::P, attributes: HashMap::new(), closing: false }),
-            Token::Element(HTMLElement { tag: HTMLTag::BOLD, attributes: HashMap::new(), closing: false }),
+            Token::Element(HtmlElement { tag: HtmlTag::H1, attributes: HashMap::new(), closing: true }),
+            Token::Element(HtmlElement { tag: HtmlTag::P, attributes: HashMap::new(), closing: false }),
+            Token::Element(HtmlElement { tag: HtmlTag::BOLD, attributes: HashMap::new(), closing: false }),
             Token::Text("Hello".into()),
-            Token::Element(HTMLElement { tag: HTMLTag::BOLD, attributes: HashMap::new(), closing: true }),
+            Token::Element(HtmlElement { tag: HtmlTag::BOLD, attributes: HashMap::new(), closing: true }),
             Token::Text(" World".into()),
-            Token::Element(HTMLElement { tag: HTMLTag::P, attributes: HashMap::new(), closing: true }),
-            Token::Element(HTMLElement { tag: HTMLTag::A, attributes: HashMap::from([("href".into(), "https://www.google.com".into()); 1]), closing: false}),
+            Token::Element(HtmlElement { tag: HtmlTag::P, attributes: HashMap::new(), closing: true }),
+            Token::Element(HtmlElement { tag: HtmlTag::A, attributes: HashMap::from([("href".into(), "https://www.google.com".into()); 1]), closing: false}),
             Token::Text("Google".into()),
-            Token::Element(HTMLElement { tag: HTMLTag::A, attributes: HashMap::new(), closing: true }),
-            Token::Element(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::from([("src".into(), "/home/garrett/Documents/image.jpg".into()); 1]), closing: false }),
-            Token::Element(HTMLElement { tag: HTMLTag::IMG, attributes: HashMap::new(), closing: true }),
-            Token::EOF
+            Token::Element(HtmlElement { tag: HtmlTag::A, attributes: HashMap::new(), closing: true }),
+            Token::Element(HtmlElement { tag: HtmlTag::IMG, attributes: HashMap::from([("src".into(), "/home/garrett/Documents/image.jpg".into()); 1]), closing: false }),
+            Token::Element(HtmlElement { tag: HtmlTag::IMG, attributes: HashMap::new(), closing: true }),
+            Token::Eof
         ]))
     }
 
     #[test]
     fn test_render() {
-        let mut terminal = Terminal::new(TestBackend::new(80, 20)).unwrap();
-        terminal
-            .draw(|frame| {
+        if let Ok(mut terminal) = Terminal::new(TestBackend::new(80, 20)) {
+            terminal
+                .draw(|frame| {
 
-//                 let html = r#"
-// <p>Hey everyone!</p><p>This is the list of all the changes we've done to our projects during the month of March.</p> <img src="../media/content/videos/march_2026.jpg" alt="the familiar from the game Donsol is sitting on Doctor Claws desk where Mad Cat should be, looking content while being petted by the armored hand of the Inspector Gadget villain" loading="lazy" width="1200" height="679"> <ul> <li><b>Wiki</b>, documented the replacement of Pino's <a href="../site/standing_rigging_replacement.html#mar2026">backstay</a>, and created a project page for <a href="../site/no_bears_none.html">No Bears, None</a>.</li> <li><b><a href="https://kokorobot.ca/site/hakum.html">Hakum</a></b>, completed <a href="https://kokorobot.ca/media/content/hakum_sabo_10.jpg" target="_blank">page 10</a> of <a href="https://kokorobot.ca/site/sabotage_study.html" target="_blank">Sabotage Study</a>.</li> <li><b><a href="../site/rabbit_waves.html">Rabbit Waves</a></b>, added a <a href="https://rabbitwaves.ca/media/comic/coffeep1.jpg" target="_blank">comic page</a>.</li> <li><b><a href="../site/grimgrains.html">Grimgrains</a></b>, updated lactofermentation section about <a href="https://grimgrains.com/site/lactofermentation.html#jars">jars</a>.</li> <li><b><a href="../site/oquonie.html">Oquonie</a></b>, released a new version with lots of tiny optimizations.</li> <li><b><a href="../site/uxn.html">Uxn</a></b>, released a little <a href='https://wiki.xxiivv.com/site/m5' target='_blank'>emulator for the m5 stack</a>.</li> </ul> <p>We spent a big chunk of the month finishing up the new <a href="../site/donsol.html">Donsol</a>. Devine <a href="https://rabbits.srht.site/decadv/" target="_blank">documented</a> the development as part of a spring edition of <a href="https://eli.li/december-adventure" target="_blank">December Adventure</a>. All of the graphics are done and the game is fully playable, all we have left to do is to test for bugs and to write the music. It looks <a href="https://rabbits.srht.site/days/2026/03/29.html" target="_blank">fantastic</a>. We'll let you all know when we have a release date!</p> <p>The goal with <a href="https://rabbitwaves.ca">Rabbit Waves</a> was always to use storytelling to teach analog seafaring skills by making it possible to navigate between different topics by selecting highlighted objects in comic strips. Rek completed the <a href="https://rabbitwaves.ca/media/comic/coffeep1.jpg" target="_blank">first page</a>, featuring a rabbit sailor's morning coffee-making routine while living on a small turnip sailboat at sea. This comic is the first step towards that goal of building a larger world for Rabbit Waves.</p> <p>Spring is here and we are catching up with boat maintenance. While doing checks aboard last fall we noticed that Pino's <a href="../site/standing_rigging_replacement.html#mar2026">backstay</a> had a cut, we replaced the stay this week and plan to do the same for the headstay.</p> <p>This month, we also finished proofreading the revised version of the <a href="../site/victoria_to_sitka_logbook.html">Victoria to sitka logbook</a>, which we will now refer to as <a href="../site/no_bears_none.html">No Bears, None</a>. We still have work to do on it, but we hope to release it later this summer, or early fall. Lastly, we'd like to thank everyone who purchased <a href="../site/store.html">rabbit stickers</a> last month! Devine continues to draw very <a href="https://rabbits.srht.site/days/2026/03/31.html" target="_blank">beautiful spirographs</a> onto each letter.</p> <p><b>Book Club:</b> We are reading <i>Island</i> by Aldous Huxley.</p>
-// "#;
-
-                let html = r#"
+                    let html = r#"
  <p>Breht reads and reacts to "A Letter To The American People" written by Masoud Pezeschkian, the Iranian president, as a ground invasion of some sort seems imminent. Check out our new design in collaboration with <em>Goods for the People</em> <a href="https://goodsforthepeople.com/">HERE</a></p> <p> </p> <p> -------------------------------------------------------------------------------</p> <p>Support Rev Left and get bonus episodes on <a href= "https://www.patreon.com/revleftradio">Patreon</a></p> <p>Make a one-time donation to Rev Left at <a href= "https://buymeacoffee.com/revleftradio">BuyMeACoffee.com/revleftradio</a></p> <p>Follow RLR on IG <a href= "https://www.instagram.com/rev_left_radio_official/" rel= "noopener noreferrer nofollow">HERE</a></p> <p>Learn more about Rev Left <a href= "https://revleftradio.com/">HERE</a></p>
-"#;
-                let html_widget = HTMLWidget::new(String::from(html));
-                frame.render_widget(html_widget.get_paragraph(), frame.area());
-            })
+ "#;
+                    let html_widget = HtmlWidget::new(String::from(html));
+                    frame.render_widget(html_widget.get_paragraph(), frame.area());
+                })
             .unwrap();
-        assert_snapshot!(terminal.backend());
+            assert_snapshot!(terminal.backend());
+        }
     }
 }
 
