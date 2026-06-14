@@ -3,7 +3,7 @@ pub mod tuihtml;
 use color_eyre::Result;
 use crossterm::event::{self, Event};
 use ratatui::{DefaultTerminal, Frame};
-use crate::tuihtml::{parser::construct_widget, widget::HTMLWidget};
+use crate::tuihtml::widget::HTMLWidget;
 
 fn main() -> Result<()> {
     color_eyre::install()?;

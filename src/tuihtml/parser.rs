@@ -37,11 +37,8 @@ impl StyleContext {
     pub fn remove_modifiers(&mut self, tag: HTMLTag) {
         let modifiers = tag.to_modifers();
         for modifier in modifiers {
-            match self.active_modifiers.iter().position(|m| *m == modifier) {
-                Some(i) => {
-                    self.active_modifiers.remove(i);
-                },
-                _ => {}
+            if let Some(i) = self.active_modifiers.iter().position(|m| *m == modifier) {
+                self.active_modifiers.remove(i);
             }
 
         }
@@ -83,11 +80,9 @@ pub fn get_html_style<'a>(tag: &HTMLTag, spans: &mut Vec<Span<'a>>, context: &St
         HTMLTag::H1 => {
             let spans_width: usize = spans.iter().map(|span| span.width()).collect::<Vec<usize>>().iter().sum();
             let header_spacing = vec![Span::from(" ".repeat(spans_width / 2))];
-            let header_line = Line::from(vec![
-                header_spacing.clone(),
+            let header_line = Line::from([header_spacing.clone(),
                 spans.clone(),
-                header_spacing
-            ].concat());
+                header_spacing].concat());
             let overscore_line = Line::from(Span::from("\u{00AF}".repeat(spans_width * 2)));
 
             spans.clear();
@@ -107,29 +102,25 @@ pub fn get_html_style<'a>(tag: &HTMLTag, spans: &mut Vec<Span<'a>>, context: &St
                             match state {
                                 ListState::ORDERED => {
                                     let list_item = Line::from(
-                                        vec![
-                                            vec![Span::from(format!(
+                                        [vec![Span::from(format!(
                                                 "{}{}. ",
                                                 " ".repeat(2 * context.list_state.len()),
                                                 context.list_index.last()
-                                                    .unwrap_or(&usize::from(0 as usize))
+                                                    .unwrap_or(&0_usize)
                                                     .clone()
                                             ))],
-                                            spans.clone()
-                                        ].concat()
+                                            spans.clone()].concat()
                                     );
                                     spans.clear();
                                     vec![list_item]
                                 },
                                 ListState::UNORDERED => {
                                     let list_item = Line::from(
-                                        vec![
-                                            vec![Span::from(format!(
+                                        [vec![Span::from(format!(
                                                 "{}\u{2022} ",
                                                 " ".repeat(2 * context.list_state.len()),
                                             ))],
-                                            spans.clone()
-                                        ].concat()
+                                            spans.clone()].concat()
                                     );
                                     spans.clear();
                                     vec![list_item]
@@ -224,7 +215,6 @@ pub fn construct_widget<'a>(html: String) -> (Paragraph<'a>, Vec<String>) {
     let mut element_stack: Vec<HTMLElement> = Vec::new();
 
     for token in tokens {
-        // println!("{:?}", token);
 
         if Token::is_whitespace(&token) &&
             !style_context.styled() &&
@@ -237,10 +227,8 @@ pub fn construct_widget<'a>(html: String) -> (Paragraph<'a>, Vec<String>) {
                 match &element.closing {
                     true => {
                         if let Some(removed_element) = element_stack.pop() {
-                            lines = vec![
-                                lines,
-                                get_html_style(&removed_element.tag, &mut spans, &style_context)
-                            ].concat();
+                            lines = [lines,
+                                get_html_style(&removed_element.tag, &mut spans, &style_context)].concat();
 
                             style_context.remove_modifiers(removed_element.tag);
 
@@ -284,10 +272,8 @@ pub fn construct_widget<'a>(html: String) -> (Paragraph<'a>, Vec<String>) {
 
                         match is_self_closing(&element.tag) {
                             true => {
-                                lines = vec![
-                                    lines,
-                                    get_html_style(&element.tag, &mut spans, &style_context)
-                                ].concat();
+                                lines = [lines,
+                                    get_html_style(&element.tag, &mut spans, &style_context)].concat();
                             },
                             false => {
                                 style_context.add_modifiers(element.tag.clone());

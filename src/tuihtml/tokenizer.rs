@@ -38,7 +38,7 @@ impl Token {
                         return false;
                     }
                 }
-                return true
+                true
             }
             _ => false
         }
@@ -95,10 +95,10 @@ impl<'a> HTMLTokenizer<'a> {
         }
 
         if lexeme.is_empty() {
-            return Token::EOF;
+            Token::EOF
         }
         else {
-            return Token::Text(lexeme);
+            Token::Text(lexeme)
         }
     }
 
@@ -136,7 +136,7 @@ impl<'a> HTMLTokenizer<'a> {
             self.next_char();
         }
 
-        return HTMLElement::new(HTMLTag::from_string(tag), attributes, closing_tag);
+        HTMLElement::new(HTMLTag::from_string(tag), attributes, closing_tag)
 
     }
 
@@ -147,11 +147,11 @@ impl<'a> HTMLTokenizer<'a> {
 
         #[derive(PartialEq)]
         enum AttributeState {
-            KEY,
-            VALUE
+            Key,
+            Value
         }
 
-        let mut state = AttributeState::KEY;
+        let mut state = AttributeState::Key;
 
         while self.next_char.is_some() {
             match self.next_char {
@@ -159,16 +159,16 @@ impl<'a> HTMLTokenizer<'a> {
                     return attributes;
                 },
                 Some('=') => {
-                    if state == AttributeState::KEY {
-                        state = AttributeState::VALUE;
+                    if state == AttributeState::Key {
+                        state = AttributeState::Value;
                         self.next_char();
                         self.consume_whitespace();
                         self.next_char();
                     }
                 },
                 Some('\"') | Some('\'') => {
-                    if state == AttributeState::VALUE {
-                        state = AttributeState::KEY;
+                    if state == AttributeState::Value {
+                        state = AttributeState::Key;
                         attributes.insert(key.clone(), value.clone());
                         self.next_char();
                         self.consume_whitespace();
@@ -180,13 +180,20 @@ impl<'a> HTMLTokenizer<'a> {
                     break;
                 }
                 _ => {
-                    key.push(self.next_char.unwrap());
+                    match state {
+                        AttributeState::Key => {
+                            key.push(self.next_char.unwrap());
+                        },
+                        AttributeState::Value => {
+                            value.push(self.next_char.unwrap());
+                        }
+                    }
                     self.next_char();
                 }
             }
         }
 
-        return attributes;
+        attributes
     }
 
     fn next_char(&mut self) {
