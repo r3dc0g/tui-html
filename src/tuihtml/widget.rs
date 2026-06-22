@@ -2,18 +2,17 @@ use ratatui::widgets::Paragraph;
 
 use crate::tuihtml::parser::construct_widget;
 
+#[derive(Default)]
 pub struct HtmlWidget<'a> {
-    paragraph: Paragraph<'a>,
-    links: Vec<String>,
+    pub paragraph: Paragraph<'a>,
+    pub links: Vec<String>,
+    pub images: Vec<String>,
 }
 
-impl HtmlWidget<'_> {
+impl<'a> HtmlWidget<'a> {
+
     pub fn new(html: String) -> Self {
-        let (paragraph, links) = construct_widget(html);
-        Self {
-            paragraph,
-            links
-        }
+        construct_widget(html)
     }
 
     pub fn get_paragraph(&self) -> Paragraph<'_> {
@@ -22,5 +21,9 @@ impl HtmlWidget<'_> {
 
     pub fn get_links(&self) -> Vec<String> {
         self.links.clone()
+    }
+
+    pub fn get_images(&self) -> Vec<String> {
+        self.images.clone()
     }
 }

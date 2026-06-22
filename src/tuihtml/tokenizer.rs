@@ -56,7 +56,7 @@ impl<'a> HtmlTokenizer<'a> {
     pub fn new(html: Chars<'a>) -> HtmlTokenizer<'a> {
         let mut tokenizer = HtmlTokenizer {
             html_pos: html,
-            next_char: Some('\0'),
+            next_char: None,
         };
 
         tokenizer.init();
@@ -78,6 +78,8 @@ impl<'a> HtmlTokenizer<'a> {
                         self.next_char();
                         return Token::Element(self.capture_element())
                     }
+                    // Leave '<' unconsumed as next_char so the next call
+                    // to next() can begin parsing the element.
                     return Token::Text(lexeme);
                 },
                 Some('\n') | Some('\r') => {
@@ -126,6 +128,9 @@ impl<'a> HtmlTokenizer<'a> {
                 },
                 Some('>') => {
                     self.next_char();
+                    // Only collapse trailing newlines/whitespace after '>'.
+                    // In a TUI context we may not know what styling applies,
+                    // so we trim for clarity rather than preserving all whitespace.
                     if self.next_char.is_some_and(|c| c == '\n' || c == '\r' ) {
                         self.consume_whitespace();
                     }
@@ -168,9 +173,11 @@ impl<'a> HtmlTokenizer<'a> {
                 Some('=') => {
                     if state == AttributeState::Key {
                         state = AttributeState::Value;
-                        self.next_char();
+                        self.next_char();           // advance past '='
                         self.consume_whitespace();
-                        self.next_char();
+                        self.next_char();           // skip the opening quote so value content is
+                                                    // captured directly; the closing quote will be
+                                                    // caught by the quote arm below
                     }
                 },
                 Some('\"') | Some('\'') => {

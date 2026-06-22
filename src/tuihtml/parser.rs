@@ -1,5 +1,5 @@
 use ratatui::{style::{Modifier, Style, Stylize}, text::{Line, Span}, widgets::{Paragraph, Wrap}};
-use crate::tuihtml::{html::*, tokenizer::{HtmlTokenizer, Token}};
+use crate::tuihtml::{html::*, tokenizer::{HtmlTokenizer, Token}, widget::{HtmlWidget}};
 
 #[derive(Default, Debug, Clone, PartialEq)]
 pub enum ListState {
@@ -10,7 +10,7 @@ pub enum ListState {
 
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct StyleContext {
-    list_state: Vec<Option<ListState>>,
+    list_state: Vec<ListState>,
     list_index: Vec<usize>,
     link_list: Vec<String>,
     link_index: usize,
@@ -73,7 +73,7 @@ impl StyleContext {
     }
 }
 
-pub fn get_html_style<'a>(tag: &HtmlTag, spans: &mut Vec<Span<'a>>, context: &StyleContext) -> Vec<Line<'a>> {
+pub fn get_html_style<'a>(tag: &HtmlTag, mut spans: Vec<Span<'a>>, context: &StyleContext) -> (Vec<Span<'a>>, Vec<Line<'a>>) {
     const HR_WIDTH: usize = 120;
 
     match tag {
@@ -85,69 +85,61 @@ pub fn get_html_style<'a>(tag: &HtmlTag, spans: &mut Vec<Span<'a>>, context: &St
                 header_spacing].concat());
             let overscore_line = Line::from(Span::from("\u{00AF}".repeat(spans_width * 2)));
 
-            spans.clear();
-            vec![header_line.centered(), overscore_line.centered()]
+            let lines = vec![header_line.centered(), overscore_line.centered()];
+            (Vec::new(), lines)
         },
         HtmlTag::HR => {
             let overscore_line = Line::from(Span::from("\u{00AF}".repeat(HR_WIDTH)));
             let underscore_line = Line::from(Span::from("\u{005F}".repeat(HR_WIDTH)));
 
-            vec![underscore_line.centered(), overscore_line.centered()]
+            let lines = vec![underscore_line.centered(), overscore_line.centered()];
+            (spans, lines)
         },
         HtmlTag::LI => {
             match context.list_state.last() {
                 Some(last_state) => {
                     match last_state {
-                        Some(state) => {
-                            match state {
-                                ListState::Ordered => {
-                                    let list_item = Line::from(
-                                        [vec![Span::from(format!(
-                                                "{}{}. ",
-                                                " ".repeat(2 * context.list_state.len()),
-                                                context.list_index.last()
-                                                    .unwrap_or(&0_usize)
-                                                    .clone()
-                                            ))],
-                                            spans.clone()].concat()
-                                    );
-                                    spans.clear();
-                                    vec![list_item]
-                                },
-                                ListState::Unordered => {
-                                    let list_item = Line::from(
-                                        [vec![Span::from(format!(
-                                                "{}\u{2022} ",
-                                                " ".repeat(2 * context.list_state.len()),
-                                            ))],
-                                            spans.clone()].concat()
-                                    );
-                                    spans.clear();
-                                    vec![list_item]
-                                }
-                            }
+                        ListState::Ordered => {
+                            let list_item = Line::from(
+                                [vec![Span::from(format!(
+                                        "{}{}. ",
+                                        " ".repeat(2 * context.list_state.len()),
+                                        context.list_index.last()
+                                        .unwrap_or(&0_usize)
+                                        .clone()
+                                ))],
+                                spans.clone()].concat()
+                            );
+                            (Vec::new(), vec![list_item])
                         },
-                        None => {
-                            Vec::new()
+                        ListState::Unordered => {
+                            let list_item = Line::from(
+                                [vec![Span::from(format!(
+                                        "{}\u{2022} ",
+                                        " ".repeat(2 * context.list_state.len()),
+                                ))],
+                                spans.clone()].concat()
+                            );
+                            (Vec::new(), vec![list_item])
                         }
                     }
                 },
                 None => {
-                    Vec::new()
+                    (spans, Vec::new())
                 }
             }
         },
         HtmlTag::A => {
             spans.push(Span::from(format!("[{}]", context.link_index)).bold());
-            Vec::new()
+            (spans, Vec::new())
         },
         HtmlTag::H2 => {
             let spans_width: usize = spans.iter().map(|span| span.width()).collect::<Vec<usize>>().iter().sum();
             let above_line = Line::from(Span::from("\u{00A0}".repeat(spans_width)));
             let header_line = Line::from(spans.clone());
 
-            spans.clear();
-            vec![above_line, header_line.underlined() ]
+            let lines = vec![above_line, header_line.underlined()];
+            (Vec::new(), lines)
         }
         HtmlTag::H3 |
         HtmlTag::H4 |
@@ -157,8 +149,8 @@ pub fn get_html_style<'a>(tag: &HtmlTag, spans: &mut Vec<Span<'a>>, context: &St
             let above_line = Line::from(Span::from("\u{00A0}".repeat(spans_width)));
             let header_line = Line::from(spans.clone());
 
-            spans.clear();
-            vec![above_line, header_line]
+            let lines = vec![above_line, header_line];
+            (Vec::new(), lines)
         },
         HtmlTag::NAV |
         HtmlTag::DIV |
@@ -167,16 +159,15 @@ pub fn get_html_style<'a>(tag: &HtmlTag, spans: &mut Vec<Span<'a>>, context: &St
         HtmlTag::P => {
             match spans.is_empty() {
                 true => {
-                    Vec::new()
+                    (spans, Vec::new())
                 },
                 false => {
                     let line = Line::from(spans.clone());
-                    spans.clear();
-                    vec![line]
+                    (Vec::new(), vec![line])
                 }
             }
         },
-        _ => Vec::new()
+        _ => (spans, Vec::new())
     }
 }
 
@@ -205,7 +196,7 @@ fn parse_html(html: String) -> Vec<Token> {
     tokens
 }
 
-pub fn construct_widget<'a>(html: String) -> (Paragraph<'a>, Vec<String>) {
+pub fn construct_widget<'a>(html: String) -> HtmlWidget<'a> {
 
     let tokens = parse_html(html);
     let mut lines: Vec<Line<'a>> = Vec::new();
@@ -215,6 +206,11 @@ pub fn construct_widget<'a>(html: String) -> (Paragraph<'a>, Vec<String>) {
 
     for token in tokens {
 
+        // Skip whitespace tokens when not inside a styled context or a
+        // block-level text container. In a TUI we may not know what styling
+        // applies, so we collapse extraneous whitespace for clarity —
+        // except inside <p>, <div>, <section>, and <article> where spacing
+        // is semantically meaningful.
         if Token::is_whitespace(&token) &&
             !style_context.styled() &&
             (element_stack.last().is_none_or(|el| el.tag != HtmlTag::P && el.tag != HtmlTag::DIV && el.tag != HtmlTag::SECTION && el.tag != HtmlTag::ARTICLE)) {
@@ -226,8 +222,9 @@ pub fn construct_widget<'a>(html: String) -> (Paragraph<'a>, Vec<String>) {
                 match &element.closing {
                     true => {
                         if let Some(removed_element) = element_stack.pop() {
-                            lines = [lines,
-                                get_html_style(&removed_element.tag, &mut spans, &style_context)].concat();
+                            let (new_spans, new_lines) = get_html_style(&removed_element.tag, spans, &style_context);
+                            lines = [lines, new_lines].concat();
+                            spans = new_spans;
 
                             style_context.remove_modifiers(removed_element.tag);
 
@@ -247,11 +244,11 @@ pub fn construct_widget<'a>(html: String) -> (Paragraph<'a>, Vec<String>) {
                     false => {
                         match &element.tag {
                             HtmlTag::OL => {
-                                style_context.list_state.push(Some(ListState::Ordered));
+                                style_context.list_state.push(ListState::Ordered);
                                 style_context.list_index.push(0);
                             },
                             HtmlTag::UL => {
-                                style_context.list_state.push(Some(ListState::Unordered));
+                                style_context.list_state.push(ListState::Unordered);
                                 style_context.list_index.push(0);
                             }
                             HtmlTag::LI => {
@@ -266,13 +263,20 @@ pub fn construct_widget<'a>(html: String) -> (Paragraph<'a>, Vec<String>) {
                                     style_context.link_list.push(link.to_owned());
                                 }
                             }
+                            HtmlTag::IMG => {
+                                style_context.img_index += 1;
+                                if let Some(image) = element.attributes.get("src") {
+                                    style_context.img_list.push(image.to_owned());
+                                }
+                            }
                             _ => {}
                         }
 
                         match is_self_closing(&element.tag) {
                             true => {
-                                lines = [lines,
-                                    get_html_style(&element.tag, &mut spans, &style_context)].concat();
+                                let (new_spans, new_lines) = get_html_style(&element.tag, spans, &style_context);
+                                lines = [lines, new_lines].concat();
+                                spans = new_spans;
                             },
                             false => {
                                 style_context.add_modifiers(element.tag.clone());
@@ -300,7 +304,11 @@ pub fn construct_widget<'a>(html: String) -> (Paragraph<'a>, Vec<String>) {
         }
     }
 
-    (Paragraph::new(lines).wrap(Wrap { trim: false }), style_context.link_list)
+    HtmlWidget {
+        paragraph: Paragraph::new(lines).wrap(Wrap { trim: false }),
+        links: style_context.link_list,
+        images: style_context.img_list
+    }
 }
 
 mod test {
@@ -403,6 +411,25 @@ Google"#;
             Token::Element(HtmlElement { tag: HtmlTag::IMG, attributes: HashMap::new(), closing: true }),
             Token::Eof
         ]))
+    }
+
+    #[test]
+    fn images_are_properly_indexed_and_stored() {
+        let html = r#"
+        <h1>Title</h1>
+        <p><b>Hello</b> World</p>
+        <a href="https://www.google.com">Google</a>
+        <img src="/home/garrett/Documents/image1.jpg"></img>
+        <img src="/home/garrett/Documents/image2.jpg"></img>
+        <img src="/home/garrett/Documents/image3.jpg"></img>
+    "#;
+
+        let widget = construct_widget(html.into());
+
+        assert!(widget.images.len() == 3);
+        assert!(widget.images[0] == "/home/garrett/Documents/image1.jpg" );
+        assert!(widget.images[1] == "/home/garrett/Documents/image2.jpg" );
+        assert!(widget.images[2] == "/home/garrett/Documents/image3.jpg" );
     }
 
     #[test]
